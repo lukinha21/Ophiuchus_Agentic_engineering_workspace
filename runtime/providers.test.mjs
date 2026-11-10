@@ -1,0 +1,6 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {listProviders,listModels,generateText} from './providers.mjs';
+test('catalog reports configuration without leaking keys',()=>{const result=listProviders({OPENAI_API_KEY:'supersecret'});assert.equal(result.find(p=>p.id==='openai').configured,true);assert.equal(JSON.stringify(result).includes('supersecret'),false);});
+test('models are discovered using a mocked provider',async()=>{const models=await listModels('openai',{env:{OPENAI_API_KEY:'test'},fetchImpl:async(url,options)=>{assert.match(url,/\/models$/);assert.equal(options.headers.Authorization,'Bearer test');return {ok:true,json:async()=>({data:[{id:'model-b'},{id:'model-a'}]})};}});assert.deepEqual(models.map(m=>m.id),['model-a','model-b']);});
+test('adapter returns usage and text',async()=>{const result=await generateText({providerId:'openai',model:'demo',messages:[{role:'user',content:'oi'}]},{env:{OPENAI_API_KEY:'test'},fetchImpl:async()=>({ok:true,json:async()=>({choices:[{message:{content:'Olá'}}],usage:{total_tokens:9}})})});assert.equal(result.text,'Olá');assert.equal(result.usage.total_tokens,9);});
+test('no credential means no external request',async()=>{await assert.rejects(()=>listModels('openai',{env:{},fetchImpl:()=>{throw Error('Should not call');}}),/não configurado/);});

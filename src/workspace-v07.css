@@ -44,7 +44,7 @@
 .v5-composer textarea{width:100%;min-width:0}
 .v5-inspector{min-width:0}
 .v5-inspector-section,.v5-debug-event,.v5-inspector-top{overflow-wrap:anywhere}
-.v5-engineering{display:none!important}
+/* FIX 0.8: .v5-engineering is the ROOT mode class, never hide it. */
 /* Engineering is a distinct information architecture rather than a denser Focus mode. */
 .v7-engineering{display:grid;gap:18px;min-width:0;padding:3px 0 12px}
 .v7-engineering-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;min-width:0}
@@ -124,3 +124,4 @@
 .v5-engineering .v5-conversation{padding-block:12px}
 .v5-engineering .v5-active-card{padding:14px 18px}
 .v5-engineering .v5-active-main h2{font-size:19px}
+.runtime-control{margin:14px 0;padding:16px;border:1px solid #34314d;border-radius:14px;background:#151522;display:grid;gap:10px;min-width:0}.runtime-control-head,.runtime-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.runtime-control-head{justify-content:space-between;font-size:12px;color:#a8a6bd}.runtime-control .online{color:#30d4a1}.runtime-control .offline,.runtime-error{color:#ff9b9b}.runtime-actions button{background:#30264d;border:1px solid #67549a;border-radius:9px;color:#eee6ff;padding:9px 12px;cursor:pointer}.runtime-actions button:hover{background:#48356e}.runtime-control small{color:#8988a7;line-height:1.5}
