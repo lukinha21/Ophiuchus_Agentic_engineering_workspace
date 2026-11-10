@@ -78,3 +78,28 @@ Com `OPENAI_API_KEY` no ambiente do servidor e modelos configurados na aba Prove
 - HTTP 429 exibe dica e Retry-After quando fornecido, sem retry automático que gaste cota.
 - Métrica de tokens mostra o uso reportado pelo provedor (Mock = 0); não é custo em moeda.
 - Runs existentes preservam suas configurações; crie uma nova run para aplicar mudanças.
+
+
+## Pilot 1.5 — Integridade e autonomia
+
+- Respostas com `finish_reason: length` ficam em `pendingDraft` e **não avançam** a etapa. Clique novamente em **Executar etapa com IA** para continuar; o texto parcial é preservado. A continuação consome outra chamada e pode repetir texto.
+- Limite de continuações por etapa (0–3) configurável nas Preferências; rascunho pode ser descartado. Ao esgotar, descarte o rascunho. Não há retries automáticos para HTTP 429.
+- Cada artefato mostra `finishReason`, estado de integridade (`complete` apenas quando `stop`; demais são `unverified`), número de continuações e tokens de entrada/saída informados pelo provedor.
+- Política de autonomia configurável para **novas runs**: `supervised` exige ambos os checkpoints; `semi` automatiza a revisão de especificação quando há artefato real com `stop`, mas exige aprovação humana antes da entrega; `autonomous` automatiza ambos quando há artefato real com `stop`.
+- **Importante:** a aprovação automática é documental e baseada em regras simples, não uma revisão inteligente independente. Não há execução de código, compilação, testes reais, verificação semântica nem edição de arquivos. O QA é uma avaliação textual do modelo. Artefatos Mock e etapas concluídas manualmente não passam automaticamente pelos checkpoints.
+- Visualização segura de Markdown (subconjunto: títulos, parágrafos, listas, tabelas, links HTTPS e blocos de código). Conteúdo não é interpretado como HTML e não há realce sintático avançado.
+- O snapshot da configuração é criado ao iniciar uma nova run; runs antigas continuam supervisionadas.
+
+### Validação
+
+`npm run test:runtime` — testes do runtime com provedores simulados, sem custo. Não foram realizadas chamadas reais pagas.
+
+
+## Pilot 1.6 — Rastreabilidade por subtarefa
+
+- Cada subtarefa tem ID estável e registro persistido em `run.subtasks` quando existe artefato de etapa.
+- O backend emite `subtask.evidence.linked` para associar o **mesmo** artefato às subtarefas da etapa. Não são chamadas separadas, testes executados ou trabalho individual comprovado.
+- O Inspector conta eventos por `subtaskId` e indica **evidência documental (não verificada)**.
+- Correções invalidam os vínculos de evidência das etapas dependentes e registram `subtask.evidence.invalidated`.
+- Runs antigas continuam legíveis, mas não recebem eventos fictícios retroativos; podem exibir 0% nas subtarefas sem evidência persistida.
+- A fase de workspace real e a execução de testes continuam fora do escopo.

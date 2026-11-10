@@ -130,3 +130,14 @@
 .runtime-artifacts details{border:1px solid rgba(140,150,190,.24);border-radius:9px;padding:9px;min-width:0}
 .runtime-artifacts summary{cursor:pointer;overflow-wrap:anywhere}
 .runtime-artifacts pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:360px;overflow:auto;font:12px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;color:#d6defa}
+/* Pilot 1.5: safe formatted artifact previews */
+.artifact-markdown{font-size:13px;line-height:1.7;overflow-wrap:anywhere;max-height:560px;overflow:auto;padding:12px 4px;color:inherit}
+.artifact-markdown h3,.artifact-markdown h4{margin:16px 0 8px;font-size:15px;color:inherit}
+.artifact-markdown p{margin:8px 0}.artifact-markdown ul,.artifact-markdown ol{padding-left:24px;margin:8px 0}
+.artifact-markdown li{margin:3px 0}.artifact-markdown code{background:rgba(130,130,180,.16);padding:2px 5px;border-radius:4px}
+.artifact-code{background:#111526;border:1px solid #353a58;border-radius:9px;margin:12px 0;overflow:auto}
+.artifact-code>span{display:block;color:#a9b6dc;padding:7px 12px;border-bottom:1px solid #353a58;font-size:11px}
+.artifact-code pre{white-space:pre;overflow:auto;margin:0;padding:12px;font-size:12px;line-height:1.6;color:#e1e8ff}
+.artifact-code code{background:none;padding:0}.artifact-table-scroll{overflow-x:auto;margin:12px 0}
+.artifact-table-scroll table{border-collapse:collapse;width:100%;min-width:360px}.artifact-table-scroll th,.artifact-table-scroll td{padding:7px 10px;border:1px solid #3c4261;text-align:left;vertical-align:top}.artifact-table-scroll th{background:rgba(130,130,180,.14)}
+.runtime-draft{margin:10px 0;padding:12px;border:1px solid #a86d31;border-radius:9px}.runtime-draft p{margin:6px 0}

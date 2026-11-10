@@ -1,9 +1,9 @@
 /** Deterministic, offline context pruning; never sends extra API requests. */
-export const DEFAULT_OPTIONS=Object.freeze({mode:'off',maxOutputTokens:1400,historyArtifacts:7,artifactChars:6500,keepRecent:2});
+export const DEFAULT_OPTIONS=Object.freeze({mode:'off',maxOutputTokens:1400,historyArtifacts:7,artifactChars:6500,keepRecent:2,autonomy:'supervised',maxContinuations:2});
 export function normalizeOptions(value={}){
  const v=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
  const integer=(key,min,max)=>Number.isInteger(v[key])&&v[key]>=min&&v[key]<=max?v[key]:DEFAULT_OPTIONS[key];
- return {mode:['off','balanced','aggressive'].includes(v.mode)?v.mode:'off',maxOutputTokens:integer('maxOutputTokens',128,4096),historyArtifacts:integer('historyArtifacts',1,12),artifactChars:integer('artifactChars',400,12000),keepRecent:integer('keepRecent',1,5)};
+ return {mode:['off','balanced','aggressive'].includes(v.mode)?v.mode:'off',maxOutputTokens:integer('maxOutputTokens',128,4096),historyArtifacts:integer('historyArtifacts',1,12),artifactChars:integer('artifactChars',400,12000),keepRecent:integer('keepRecent',1,5),autonomy:['supervised','semi','autonomous'].includes(v.autonomy)?v.autonomy:'supervised',maxContinuations:integer('maxContinuations',0,3)};
 }
 export function compactHistory(artifacts,options){
  const cfg=normalizeOptions(options);

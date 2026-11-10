@@ -38,7 +38,7 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==='POST'&&url.pathname==='/runs'){
    const body=await readBody(req);const run=startRun(createRun({id:randomUUID(),prompt:body.prompt,agents:body.agents}));run.executionOptions={...executionOptions};runs[run.id]=run;await save();return json(res,201,run);
   }
-  const match=url.pathname.match(/^\/runs\/([\w-]+)(?:\/(complete|approve|failure|cancel|events|execute))?$/);
+  const match=url.pathname.match(/^\/runs\/([\w-]+)(?:\/(complete|approve|failure|cancel|events|execute|discard-draft))?$/);
   if(!match)return json(res,404,{error:'Rota não encontrada'});
   const run=runs[match[1]];if(!run)return json(res,404,{error:'Run não encontrado'});
   if(req.method==='GET'&&match[2]==='events')return json(res,200,run.events);
@@ -53,7 +53,8 @@ const server=http.createServer(async(req,res)=>{
   }
   if(executing.has(run.id))return json(res,409,{error:'Aguarde a execução do modelo terminar'});
   switch(match[2]){
-   case 'complete':completeStage(run,body);break;
+   case 'discard-draft':run.pendingDraft=null;break;
+   case 'complete':if(run.pendingDraft)throw Error('Existe uma resposta incompleta. Continue ou descarte o rascunho antes de concluir manualmente.');completeStage(run,body);break;
    case 'approve':approve(run,body.accepted===true);break;
    case 'failure':reportFailure(run,body);break;
    case 'cancel':cancel(run);break;

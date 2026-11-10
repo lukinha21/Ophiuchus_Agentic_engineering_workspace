@@ -1,5 +1,5 @@
 /** One-stage-at-a-time LLM execution. Never executes generated code or shell commands. */
-import {ROLES,completeStage,reportFailure} from './orchestrator.mjs';
+import {ROLES,completeStage,reportFailure,emit} from './orchestrator.mjs';
 import {generateText} from './providers.mjs';
 import {compactHistory,normalizeOptions,estimateTokens} from './optimization.mjs';
 const INSTRUCTIONS={
@@ -36,12 +36,28 @@ export async function executeStage(run,{generate=generateText}={}){
  const {providerId,model}=getBinding(run);
  const stage=run.stage;
  const options=normalizeOptions(run.executionOptions);
+ const draft=run.pendingDraft?.stage===stage?run.pendingDraft:null;
  const messages=buildMessages(run,options);
+ if(draft){
+  if(draft.attempts>options.maxContinuations)throw Error('Limite de continuações atingido. Descarte o rascunho ou aumente o limite na próxima run.');
+  messages.push({role:'assistant',content:draft.text});
+  messages.push({role:'user',content:'Continue exatamente de onde parou, sem repetir texto anterior. Termine a resposta de forma concisa. Se for JSON, complete o JSON.'});
+ }
  const result=providerId==='mock'?await mockGenerate(run):await generate({providerId,model,messages,maxOutputTokens:options.maxOutputTokens},{signal:AbortSignal.timeout(90000)});
  if(typeof result.text!=='string'||!result.text.trim())throw Error('O modelo retornou uma resposta vazia');
  if(run.status!=='RUNNING'||run.stage!==stage)throw Error('Estado alterado durante a execução');
- const qa=stage==='qa'?interpretQA(result.text):null;
- const artifact={id:`${run.id}:artifact:${run.artifacts.length+1}`,text:result.text,providerId,model,usage:result.usage??null,estimatedInputTokens:estimateTokens(messages.map(m=>m.content).join('\n')),optimizationMode:options.mode,at:new Date().toISOString()};
+ const combined=(draft?.text||'')+result.text;
+ const attempts=(draft?.attempts||0)+1;
+ const usage={prompt_tokens:(draft?.usage?.prompt_tokens||0)+(result.usage?.prompt_tokens||0),completion_tokens:(draft?.usage?.completion_tokens||0)+(result.usage?.completion_tokens||0),total_tokens:(draft?.usage?.total_tokens||0)+(result.usage?.total_tokens||0)};
+ const finishReason=result.finishReason??null;
+ if(finishReason==='length'){
+  run.pendingDraft={stage,text:combined,attempts,usage,providerId,model,finishReason};
+  emit(run,'artifact.incomplete',{attempts,maxContinuations:options.maxContinuations,reason:'Limite de geração atingido'});
+  return run;
+ }
+ const qa=stage==='qa'?interpretQA(combined):null;
+ const artifact={id:`${run.id}:artifact:${run.artifacts.length+1}`,text:combined,providerId,model,usage:(result.usage||draft?.usage)?usage:null,finishReason,integrity:finishReason==='stop'?'complete':'unverified',continuations:Math.max(0,attempts-1),estimatedInputTokens:estimateTokens(messages.map(m=>m.content).join('\n')),optimizationMode:options.mode,at:new Date().toISOString()};
+ run.pendingDraft=null;
  if(qa?.verdict==='fail'){
   run.artifacts.push({stage,...artifact});
   reportFailure(run,{kind:qa.kind,summary:`${qa.summary} — ${qa.evidence}`,origin:'qa'});
