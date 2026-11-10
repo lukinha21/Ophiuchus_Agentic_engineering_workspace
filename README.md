@@ -57,3 +57,24 @@ npm run api
 ```
 
 Em outro terminal: `npm install` e `npm run dev`. Não compartilhe sua chave nem faça commit dela. Para consultar um catálogo, abra Provedores, escolha um provedor configurado e clique em **Consultar modelos disponíveis**. Para salvar modelos por agente, abra **Agentes e modelos**.
+
+## Pilot 1.2 — execução de uma etapa por IA
+
+Com `OPENAI_API_KEY` no ambiente do servidor e modelos configurados na aba Provedores, inicie uma **nova run** para congelar os bindings. No Console, use **Executar etapa com IA** para chamar o modelo associado ao agente atual. A resposta é salva como artefato na run e pode ser expandida na interface. O QA devolve uma decisão estruturada ao Orquestrador, que reabre a etapa responsável em caso de falha. Aprovações humanas continuam obrigatórias.
+
+- Execute `npm run api` e `npm run dev` em terminais separados.
+- Cada clique chama uma API externa e pode gerar custos.
+- Não existe execução de código, acesso a arquivos do projeto, terminal, testes reais nem edição automática. As respostas são propostas de IA, não entregáveis aplicados ao repositório.
+- Para usar modelos selecionados depois de criar uma run, inicie outra run (snapshot imutável).
+- Erros de rede ou respostas inválidas deixam a etapa atual intacta.
+- O endpoint local `/runs/:id/execute` aceita uma execução por vez por run.
+
+
+## Pilot 1.3 — Limites, Mock e economia de contexto
+
+- `mock/offline` é um provedor local sem chamadas externas. Na tela **Provedores**, consulte modelos do Mock e vincule **todos** os agentes ao `mock/offline` **antes de iniciar uma nova run**. O Mock apenas valida o fluxo, não executa testes de código.
+- Em **Configurações → Preferências**, selecione economia de contexto desligada, balanceada ou agressiva; defina saída de 128 a 4096 tokens, janela de artefatos e limite de caracteres. Opções são persistidas em `.ophiuchus-local/options.json` e congeladas no snapshot de cada nova run.
+- Economia local por extração determinística de linhas relevantes de artefatos antigos (pruning). **Não é o algoritmo do OpenCode/9router, nem uma integração com seus serviços**; foi inspirada na estratégia pública de compactação, sem custo de sumarização por IA. A redução de tokens é aproximada e pode omitir informações importantes.
+- HTTP 429 exibe dica e Retry-After quando fornecido, sem retry automático que gaste cota.
+- Métrica de tokens mostra o uso reportado pelo provedor (Mock = 0); não é custo em moeda.
+- Runs existentes preservam suas configurações; crie uma nova run para aplicar mudanças.

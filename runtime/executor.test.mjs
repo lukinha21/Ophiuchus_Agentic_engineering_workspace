@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {createRun,startRun,completeStage,approve} from './orchestrator.mjs';
+import {executeStage,interpretQA,getBinding} from './executor.mjs';
+const agents=['orchestrator','architect','developer','reviewer','qa','documentation'].map(role=>({id:role,role:role.toUpperCase(),enabled:true,modelBinding:{providerId:'openai',modelId:'test-model'}}));
+const run=()=>startRun(createRun({id:'t'+Math.random(),prompt:'Construir API',agents}));
+test('IA conclui etapa e persiste artefato, com modelo congelado',async()=>{const r=run();const result=await executeStage(r,{generate:async()=>({text:'Plano de requisitos',usage:{total_tokens:20}})});assert.equal(result.stage,'specification');assert.equal(result.artifacts[0].text,'Plano de requisitos');assert.equal(getBinding(result).model,'test-model')});
+test('QA falha e devolve para desenvolvimento',async()=>{const r=run();completeStage(r);completeStage(r);approve(r,true);completeStage(r);completeStage(r);completeStage(r);assert.equal(r.stage,'qa');await executeStage(r,{generate:async()=>({text:JSON.stringify({verdict:'fail',kind:'code',summary:'JWT quebrado',evidence:'Não cobre token expirado'})})});assert.equal(r.stage,'implementation');assert.equal(r.corrections,1);assert.equal(r.artifacts.at(-1).stage,'qa')});
+test('resposta inválida do QA não avança',async()=>{const r=run();r.stage='qa';await assert.rejects(executeStage(r,{generate:async()=>({text:'OK'})}),/JSON/);assert.equal(r.stage,'qa');assert.equal(r.artifacts.length,0)});
+test('falha no provedor não avança nem registra artefato',async()=>{const r=run();await assert.rejects(executeStage(r,{generate:async()=>{throw Error('HTTP 429')}}),/429/);assert.equal(r.stage,'discovery');assert.equal(r.artifacts.length,0)});
+test('interpretação QA aceita JSON com code fence',()=>{assert.equal(interpretQA('```json\n{"verdict":"pass","kind":"code","summary":"ok","evidence":"revisão estática"}\n```').verdict,'pass')});

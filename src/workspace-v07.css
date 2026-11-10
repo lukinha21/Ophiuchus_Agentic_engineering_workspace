@@ -125,3 +125,8 @@
 .v5-engineering .v5-active-card{padding:14px 18px}
 .v5-engineering .v5-active-main h2{font-size:19px}
 .runtime-control{margin:14px 0;padding:16px;border:1px solid #34314d;border-radius:14px;background:#151522;display:grid;gap:10px;min-width:0}.runtime-control-head,.runtime-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.runtime-control-head{justify-content:space-between;font-size:12px;color:#a8a6bd}.runtime-control .online{color:#30d4a1}.runtime-control .offline,.runtime-error{color:#ff9b9b}.runtime-actions button{background:#30264d;border:1px solid #67549a;border-radius:9px;color:#eee6ff;padding:9px 12px;cursor:pointer}.runtime-actions button:hover{background:#48356e}.runtime-control small{color:#8988a7;line-height:1.5}
+.runtime-actions button:disabled{opacity:.55;cursor:wait}
+.runtime-artifacts{display:grid;gap:8px;margin-top:12px;min-width:0}
+.runtime-artifacts details{border:1px solid rgba(140,150,190,.24);border-radius:9px;padding:9px;min-width:0}
+.runtime-artifacts summary{cursor:pointer;overflow-wrap:anywhere}
+.runtime-artifacts pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:360px;overflow:auto;font:12px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;color:#d6defa}
