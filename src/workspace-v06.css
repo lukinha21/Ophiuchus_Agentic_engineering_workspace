@@ -1,0 +1,71 @@
+/* Pilot 0.6: responsive, resizeable workspace layout. Overrides 0.5 without changing domain logic. */
+.v5-app{height:100dvh;min-height:580px;overflow:hidden}
+.v5-body{height:100%;min-height:0;overflow:hidden}
+.v5-topbar{flex-shrink:0;min-width:0;gap:clamp(8px,1.2vw,20px);padding-inline:clamp(10px,1.5vw,22px)}
+.v5-wordmark{min-width:0;flex:0 1 170px}
+.v5-tabs{flex-shrink:0}
+.v5-top-actions{flex-shrink:0}
+.v5-workspace.v6-workspace{min-height:0;height:100%;flex:1;grid-template-columns:var(--v6-agents,260px) minmax(0,1fr);overflow:hidden}
+.v5-workspace.v6-workspace.with-inspector{grid-template-columns:var(--v6-agents,260px) minmax(0,1fr) var(--v6-inspector,290px)}
+.v5-workspace.v6-workspace.no-rail{grid-template-columns:minmax(0,1fr)}
+.v5-workspace.v6-workspace.no-rail.with-inspector{grid-template-columns:minmax(0,1fr) var(--v6-inspector,290px)}
+.v6-workspace .v5-agents,.v6-workspace .v5-inspector{min-width:0;min-height:0;overflow:auto}
+.v6-workspace .v5-center{min-width:0;min-height:0;overflow-y:auto;overscroll-behavior:contain;gap:clamp(12px,1.5vh,19px);padding:clamp(15px,2vw,25px) clamp(14px,2.3vw,32px) 16px}
+.v6-workspace .v5-console-heading{min-width:0}
+.v6-workspace .v5-console-heading h1{font-size:clamp(20px,2vw,28px);line-height:1.18;overflow-wrap:break-word}
+.v6-workspace .v5-console-heading p{line-height:1.5}
+.v6-workspace .v5-chat-bubble{min-width:0;max-width:min(82%,520px)}
+.v6-workspace .v5-chat-response{min-width:0}
+.v6-workspace .v5-timeline-copy{min-width:0}
+.v6-workspace .v5-timeline-copy strong{overflow-wrap:anywhere}
+.v6-workspace .v5-active-main{min-width:0;align-items:center}
+.v6-workspace .v5-active-main>div:first-child{min-width:0}
+.v6-workspace .v5-active-main h2{font-size:clamp(17px,1.7vw,22px);overflow-wrap:anywhere}
+.v6-workspace .v5-owner{flex-wrap:wrap}
+.v6-workspace .v5-engineering{min-width:0}
+.v6-workspace .v5-engineering-task{width:100%;min-width:0}
+.v6-workspace .v5-engineering-copy small{line-height:1.5;overflow-wrap:anywhere}
+.v6-workspace .v5-engineering-meta{flex-shrink:0}
+.v6-workspace .v5-composer{position:sticky;bottom:0;z-index:5;flex-shrink:0;backdrop-filter:blur(16px);box-shadow:0 -10px 30px #0c0c1eaa,0 8px 35px #0506105c}
+.v6-workspace .v5-composer textarea{resize:none;max-height:150px}
+.v6-resizer{position:absolute;top:0;bottom:0;width:10px;z-index:12;cursor:col-resize;touch-action:none;transform:translateX(-50%)}
+.v6-resizer::after{content:'';position:absolute;top:15%;bottom:15%;left:4px;width:2px;border-radius:4px;background:transparent;transition:background .15s,box-shadow .15s}
+.v6-resizer:hover::after,.v6-resizer:active::after{background:#a68aff;box-shadow:0 0 14px #9266ff}
+.v6-resizer-left{left:var(--v6-agents,260px)}
+.v6-resizer-right{right:var(--v6-inspector,290px);transform:translateX(50%)}
+.v6-workspace.no-rail .v6-resizer-right{right:var(--v6-inspector,290px)}
+.v6-workspace .v5-inspector{overflow-y:auto;overflow-x:hidden}
+.v6-workspace .v5-debug-list{max-height:min(32vh,300px)}
+.v5-topbar .v5-mode-toggle{white-space:nowrap}
+@media(max-width:1350px){.v5-topbar .v5-wordmark{flex-basis:145px}.v5-topbar .v5-live{display:none}}
+@media(max-width:1100px){
+ .v5-workspace.v6-workspace,.v5-workspace.v6-workspace.with-inspector{grid-template-columns:220px minmax(0,1fr)}
+ .v5-workspace.v6-workspace.no-rail,.v5-workspace.v6-workspace.no-rail.with-inspector{grid-template-columns:minmax(0,1fr)}
+ .v6-workspace .v5-inspector{position:absolute;right:0;top:0;bottom:0;width:min(360px,calc(100% - 28px));z-index:24;box-shadow:-16px 0 60px #000a;border-left:1px solid #66518c}
+ .v5-topbar .v5-wordmark{display:none}
+ .v6-workspace .v5-center{padding-inline:clamp(14px,3vw,30px)}
+}
+@media(max-width:760px){
+ .v5-app{min-height:0}
+ .v5-workspace.v6-workspace,.v5-workspace.v6-workspace.with-inspector,.v5-workspace.v6-workspace.no-rail,.v5-workspace.v6-workspace.no-rail.with-inspector{grid-template-columns:minmax(0,1fr)}
+ .v6-workspace .v5-agents{display:none}
+ .v5-topbar{height:58px}
+ .v5-topbar .v5-tabs{min-width:0}
+ .v5-topbar .v5-top-actions{gap:5px}
+ .v5-topbar .v5-iconbtn,.v5-topbar .v5-mode-toggle{padding:0 8px}
+ .v6-workspace .v5-center{padding:15px 12px 12px}
+ .v6-workspace .v5-console-head{align-items:flex-start}
+ .v6-workspace .v5-console-heading h1{font-size:22px}
+ .v6-workspace .v5-active-card{padding:15px}
+ .v6-workspace .v5-active-main{gap:10px}
+ .v6-workspace .v5-active-main h2{font-size:18px}
+ .v6-workspace .v5-conversation{gap:13px}
+ .v6-workspace .v5-chat-avatar{width:33px;height:33px}
+ .v6-workspace .v5-chat-line{gap:8px}
+ .v6-workspace .v5-chat-bubble{max-width:calc(100% - 41px);padding:12px}
+ .v6-workspace .v5-engineering{padding:12px}
+ .v6-workspace .v5-engineering-task{padding:9px 7px;gap:7px}
+ .v6-workspace .v5-quick-metrics{flex-wrap:wrap}
+ .v6-workspace .v5-quick-metrics>div{min-width:100px}
+}
+@media(max-height:720px){.v6-workspace .v5-center{gap:11px}.v6-workspace .v5-conversation{gap:12px}.v6-workspace .v5-active-card{padding:13px 17px}.v6-workspace .v5-timeline{margin-top:12px}}

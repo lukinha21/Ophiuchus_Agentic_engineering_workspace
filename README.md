@@ -1,31 +1,25 @@
-# Ophiuchus Pilot 0.5 — Workspace Modes
+# Ophiuchus Pilot 0.6 — Adaptive Workspace
 
-Protótipo React + TypeScript + Vite. **Não executa modelos de IA reais.** A orquestração, os eventos e os estados são simulados. As métricas do Dashboard são demonstrativas.
+Evolução do Pilot 0.5, mantendo Console, Dashboard, configurações de agentes, bindings manuais e simulação.
+
+## Novidades
+- Painéis de agentes e Inspector redimensionáveis por arraste em janelas largas.
+- Larguras dos painéis persistidas no localStorage (`ophiuchus.panels.v06`).
+- Inspector vira painel sobreposto em janelas com largura inferior a 1100 px.
+- Área central com largura mínima flexível, rolagem própria e composer fixado ao final da área visível.
+- Melhorias de quebra de texto, dimensionamento de cards, subtarefas e modo Engenharia.
+- Adaptação de barra superior e componentes para janelas pequenas.
 
 ## Executar
-
 ```bash
 npm install
 npm run dev
 ```
 
-## O que mudou
+## Validar
+```bash
+npm run build
+```
 
-- Identidade visual premium inspirada na referência enviada: dock de navegação, agentes e tarefas hierárquicos, console de conversa, card de tarefa ativa e composer persistente.
-- Dois modos: **Foco** (padrão, informações essenciais) e **Engenharia** (plano completo, subtarefas e detalhes).
-- Painel de preferências com alternância instantânea, densidade, sidebar, Inspector, métricas rápidas, animações e nível de detalhamento. Preferências salvas em `localStorage` do navegador.
-- Inspector contextual por agente ou tarefa, com eventos de diagnóstico filtrados.
-- Dashboard e configuração de provedores/bindings preservados do Pilot 0.4.
-- Indicadores animados apenas durante a execução simulada.
-
-## Limites conhecidos
-
-- Modelos, conexões, autenticação OAuth/API keys, execução de ferramentas, persistência do histórico de runs e custos reais **ainda não estão implementados**.
-- Métricas rápidas mostram apenas dados que a simulação realmente fornece (eventos/tarefas); tokens ficam indisponíveis.
-- A simulação segue uma sequência predefinida e não gera artefatos reais.
-- Preferências visuais persistem localmente, não entre dispositivos.
-- Não há checkpoint humano real ainda.
-
-## Próxima fase
-
-Backend de orquestração, ProviderRegistry/ModelRegistry, persistência de tarefas e eventos, telemetria real, segurança e testes E2E.
+## Limites
+A orquestração, o catálogo de provedores e métricas continuam demonstrativos. Não há integração real com APIs, sandbox ou Tauri. O build completo não foi validado neste ambiente porque a instalação do npm excedeu o tempo disponível.
