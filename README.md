@@ -103,3 +103,22 @@ Com `OPENAI_API_KEY` no ambiente do servidor e modelos configurados na aba Prove
 - Correções invalidam os vínculos de evidência das etapas dependentes e registram `subtask.evidence.invalidated`.
 - Runs antigas continuam legíveis, mas não recebem eventos fictícios retroativos; podem exibir 0% nas subtarefas sem evidência persistida.
 - A fase de workspace real e a execução de testes continuam fora do escopo.
+
+## Pilot 1.7 — Workspace de arquivos com aprovação explícita
+
+- Após a etapa **implementation**, o modelo pode propor arquivos em blocos como ` ```javascript file:src/index.js ` (com quebra de linha após o cabeçalho).
+- O painel **Workspace real · Arquivos** permite inspecionar o conteúdo, selecionar arquivos e confirmar a gravação manualmente.
+- Os arquivos são gravados exclusivamente em `.ophiuchus-local/workspaces/<run-id>/`, isolados por execução. Não são escritos no código-fonte do Ophiuchus nem em repositórios externos.
+- Bloqueios de path traversal, caminhos absolutos, arquivos ocultos, symlinks, tamanho (128 KiB por arquivo) e quantidade (40 arquivos) são aplicados no backend.
+- Cada aprovação de gravação gera evento `workspace.files.applied` na run.
+- **Limites intencionais:** não há execução de shell, testes, git, edição automática ou validação de código. Arquivos são propostas de IA não confiáveis; revise antes de aprovar. A gravação substitui arquivos de mesmo nome no workspace da run. Não exponha a API local em rede pública.
+
+
+## Pilot 1.8 — diffs e testes controlados
+
+- **Comparar** exibe a versão já gravada e a proposta mais recente, sem alterar arquivos. É uma comparação lado a lado, não um algoritmo de diff por linha.
+- **Executar testes (Docker)** exige seleção explícita do usuário, Docker instalado e imagem `node:22-alpine` já disponível localmente (ou acesso prévio para baixar a imagem manualmente). A chamada Docker não faz fallback para execução no host. Executa apenas arquivos `*.test.js`, `*.spec.js`, `*.test.mjs`, `*.spec.mjs`, `*.test.cjs`, `*.spec.cjs` usando `node --test`, sem instalar dependências. Para ESM `.js`, inclua `package.json` com `"type":"module"` no workspace.
+- O contêiner é criado sem rede, com filesystem raiz somente leitura, workspace montado somente leitura, privilégios reduzidos e limites de CPU/memória/processos e timeout. **Docker não é uma fronteira de segurança absoluta**, especialmente em hosts compartilhados ou com daemon comprometido; execute somente projetos que você aceita testar e use máquina/VM descartável para código realmente hostil.
+- O resultado dos testes é salvo na run com evento e saída limitada a 32 KB. Se houver falhas, o usuário pode autorizar a devolução ao Desenvolvedor; não ocorre reexecução automática de IA nem gasto automático.
+- Ações de escrita continuam exigindo aprovação explícita. Os testes não podem editar o workspace.
+- Não há suporte ainda a dependências npm, testes de navegador, CI ou execução de projetos de outras linguagens.

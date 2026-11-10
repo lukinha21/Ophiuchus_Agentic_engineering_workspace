@@ -6,11 +6,14 @@ import {randomUUID} from 'node:crypto';
 import {createRun,startRun,completeStage,approve,reportFailure,cancel} from './orchestrator.mjs';
 import {listProviders,listModels} from './providers.mjs';
 import {executeStage} from './executor.mjs';
+import {extractProposals,listWorkspace,readWorkspaceFile,applyProposals} from './workspace.mjs';
 import {normalizeOptions,DEFAULT_OPTIONS} from './optimization.mjs';
+import {runWorkspaceTests} from './test-runner.mjs';
 const PORT=Number(process.env.OPHIUCHUS_PORT||4317);
 const DB=resolve(process.env.OPHIUCHUS_STATE_FILE||'./.ophiuchus-local/runs.json');
 let runs={};
 const executing=new Set();
+const testing=new Set();
 const BINDINGS=resolve(process.env.OPHIUCHUS_BINDINGS_FILE||'./.ophiuchus-local/bindings.json');
 let bindings={};
 const OPTIONS=resolve(process.env.OPHIUCHUS_OPTIONS_FILE||'./.ophiuchus-local/options.json');
@@ -38,6 +41,51 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==='POST'&&url.pathname==='/runs'){
    const body=await readBody(req);const run=startRun(createRun({id:randomUUID(),prompt:body.prompt,agents:body.agents}));run.executionOptions={...executionOptions};runs[run.id]=run;await save();return json(res,201,run);
   }
+  const workspaceMatch=url.pathname.match(/^\/runs\/([\w-]+)\/workspace(?:\/(apply|file|proposals|diff|test))?$/);
+  if(workspaceMatch){
+   const run=runs[workspaceMatch[1]];if(!run)return json(res,404,{error:'Run não encontrada'});
+   const action=workspaceMatch[2];
+   if(req.method==='GET'&&!action)return json(res,200,{files:await listWorkspace(run.id)});
+   if(req.method==='GET'&&action==='file')return json(res,200,await readWorkspaceFile(run.id,url.searchParams.get('path')));
+   if(req.method==='GET'&&action==='proposals'){
+    const artifact=[...(run.artifacts||[])].reverse().find(a=>a.stage==='implementation');
+    return json(res,200,{artifactId:artifact?.id||null,files:artifact?.fileProposals||extractProposals(artifact?.text)});
+   }
+   if(req.method==='GET'&&action==='diff'){
+    const artifact=[...(run.artifacts||[])].reverse().find(a=>a.stage==='implementation');
+    const proposal=(artifact?.fileProposals||extractProposals(artifact?.text)).find(p=>p.path===url.searchParams.get('path'));
+    if(!proposal)throw Error('Proposta não encontrada');
+    let previous='';let exists=false;
+    try{previous=(await readWorkspaceFile(run.id,proposal.path)).content;exists=true;}catch(e){if(e.code!=='ENOENT')throw e;}
+    return json(res,200,{path:proposal.path,exists,before:previous,after:proposal.content,changed:!exists||previous!==proposal.content});
+   }
+   if(req.method==='POST'&&action==='test'){
+    if(executing.has(run.id)||testing.has(run.id))return json(res,409,{error:'Outra operação está em andamento'});
+    const body=await readBody(req);
+    if(body.confirm!==true)return json(res,400,{error:'Confirmação explícita necessária para executar código não confiável'});
+    testing.add(run.id);
+    try{
+     const result=await runWorkspaceTests(run.id);
+     run.testResults??=[];
+     const report={id:randomUUID(),at:new Date().toISOString(),...result};run.testResults.push(report);
+     run.events.push({id:`${run.id}:${run.events.length+1}`,at:report.at,type:result.passed?'workspace.tests.passed':'workspace.tests.failed',stage:run.stage,summary:`${result.tests.length} arquivo(s) de teste; ${result.passed?'aprovado':'falhou'}`,testResultId:report.id});
+     await save();return json(res,200,report);
+    }finally{testing.delete(run.id);}
+   }
+   if(req.method==='POST'&&action==='apply'){
+    if(executing.has(run.id)||testing.has(run.id))return json(res,409,{error:'Aguarde a operação atual'});
+    const body=await readBody(req);const artifact=run.artifacts?.find(a=>a.id===body.artifactId&&a.stage==='implementation');
+    if(!artifact)throw Error('Artefato de implementação não encontrado');
+    const proposals=artifact.fileProposals||extractProposals(artifact.text);
+    if(!proposals.length)throw Error('Nenhum arquivo proposto neste artefato');
+    if(!Array.isArray(body.paths)||!body.paths.length||body.paths.some(p=>typeof p!=='string')||new Set(body.paths).size!==body.paths.length)throw Error('Seleção inválida');
+    const selected=body.paths.map(path=>{const found=proposals.find(p=>p.path===path);if(!found)throw Error('Arquivo não pertence ao artefato');return found;});
+    const files=await applyProposals(run.id,selected);
+    run.events.push({id:`${run.id}:${run.events.length+1}`,at:new Date().toISOString(),type:'workspace.files.applied',stage:run.stage,artifactId:artifact.id,summary:`${selected.length} arquivo(s) gravado(s) com aprovação explícita`,paths:body.paths});
+    await save();return json(res,200,{files});
+   }
+   return json(res,405,{error:'Método não permitido'});
+  }
   const match=url.pathname.match(/^\/runs\/([\w-]+)(?:\/(complete|approve|failure|cancel|events|execute|discard-draft))?$/);
   if(!match)return json(res,404,{error:'Rota não encontrada'});
   const run=runs[match[1]];if(!run)return json(res,404,{error:'Run não encontrado'});
@@ -46,12 +94,12 @@ const server=http.createServer(async(req,res)=>{
   if(req.method!=='POST')return json(res,405,{error:'Método não permitido'});
   const body=await readBody(req);
   if(match[2]==='execute'){
-   if(executing.has(run.id))return json(res,409,{error:'Uma etapa já está sendo executada'});
+   if(executing.has(run.id)||testing.has(run.id))return json(res,409,{error:'Uma operação já está sendo executada'});
    executing.add(run.id);
    try{await executeStage(run);await save();return json(res,200,run);}
    finally{executing.delete(run.id);}
   }
-  if(executing.has(run.id))return json(res,409,{error:'Aguarde a execução do modelo terminar'});
+  if(executing.has(run.id)||testing.has(run.id))return json(res,409,{error:'Aguarde a operação terminar'});
   switch(match[2]){
    case 'discard-draft':run.pendingDraft=null;break;
    case 'complete':if(run.pendingDraft)throw Error('Existe uma resposta incompleta. Continue ou descarte o rascunho antes de concluir manualmente.');completeStage(run,body);break;

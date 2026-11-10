@@ -1,12 +1,13 @@
 /** One-stage-at-a-time LLM execution. Never executes generated code or shell commands. */
 import {ROLES,completeStage,reportFailure,emit} from './orchestrator.mjs';
 import {generateText} from './providers.mjs';
+import {extractProposals} from './workspace.mjs';
 import {compactHistory,normalizeOptions,estimateTokens} from './optimization.mjs';
 const INSTRUCTIONS={
  discovery:'Decomponha o pedido em requisitos, critérios de aceite e tarefas verificáveis. Não alegue que executou ferramentas.',
  specification:'Produza especificação funcional objetiva, contratos e critérios de aceite. Indique hipóteses.',
  architecture:'Desenhe arquitetura técnica, módulos, dependências, interfaces e riscos.',
- implementation:'Produza uma proposta de implementação com trechos de código e testes. Você NÃO tem acesso ao filesystem nem executa comandos.',
+ implementation:'Produza código e testes propostos. Para cada arquivo use bloco no formato ```javascript file:src/isPrime.js seguido de nova linha, conteúdo, e ``` ao final. Inclua nomes de arquivos relativos e seguros. Você NÃO tem acesso ao filesystem nem executa comandos.',
  review:'Revise criticamente a proposta de implementação. Aponte falhas reais e sugestões. Não afirme que compilou ou executou testes.',
  qa:'Avalie as propostas contra os critérios de aceite, sem fingir execução de testes. Responda SOMENTE JSON: {"verdict":"pass"|"fail","kind":"code"|"requirements"|"architecture","summary":"...","evidence":"..."}. Use fail se houver falha identificável; se não puder verificar execução, explique isso em evidence.',
  delivery:'Resuma entregáveis propostos, limitações, instruções e próximos passos. Não afirme que arquivos foram gravados.'
@@ -57,6 +58,7 @@ export async function executeStage(run,{generate=generateText}={}){
  }
  const qa=stage==='qa'?interpretQA(combined):null;
  const artifact={id:`${run.id}:artifact:${run.artifacts.length+1}`,text:combined,providerId,model,usage:(result.usage||draft?.usage)?usage:null,finishReason,integrity:finishReason==='stop'?'complete':'unverified',continuations:Math.max(0,attempts-1),estimatedInputTokens:estimateTokens(messages.map(m=>m.content).join('\n')),optimizationMode:options.mode,at:new Date().toISOString()};
+ if(stage==='implementation')artifact.fileProposals=extractProposals(combined);
  run.pendingDraft=null;
  if(qa?.verdict==='fail'){
   run.artifacts.push({stage,...artifact});
