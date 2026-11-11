@@ -5,20 +5,17 @@ export function normalizeOptions(value={}){
  const integer=(key,min,max)=>Number.isInteger(v[key])&&v[key]>=min&&v[key]<=max?v[key]:DEFAULT_OPTIONS[key];
  return {mode:['off','balanced','aggressive'].includes(v.mode)?v.mode:'off',maxOutputTokens:integer('maxOutputTokens',128,4096),historyArtifacts:integer('historyArtifacts',1,12),artifactChars:integer('artifactChars',400,12000),keepRecent:integer('keepRecent',1,5),autonomy:['supervised','semi','autonomous'].includes(v.autonomy)?v.autonomy:'supervised',maxContinuations:integer('maxContinuations',0,3)};
 }
+/** Preserve requirements and decisions, but never resend generated source from old artifacts.
+ * Full canonical source is sent separately by sourceSnapshot for review/QA/developer corrections. */
 export function compactHistory(artifacts,options){
  const cfg=normalizeOptions(options);
- const selected=artifacts.slice(-cfg.historyArtifacts);
- if(cfg.mode==='off')return selected.map(a=>`[${a.stage}]\n${String(a.text||'').slice(0,cfg.artifactChars)}`).join('\n\n');
- const limit=cfg.mode==='aggressive'?Math.min(cfg.artifactChars,1000):Math.min(cfg.artifactChars,2600);
- const recent=cfg.mode==='aggressive'?1:cfg.keepRecent;
- return selected.map((a,i)=>{
-  const raw=String(a.text||'').trim();
-  if(i>=selected.length-recent)return `[${a.stage}]\n${raw.slice(0,limit)}`;
-  // Extract structural highlights; deterministic and free. No invented summary.
-  const lines=raw.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-  const priority=lines.filter(s=>/^#{1,5}\s|^(?:[-*]|\d+[.)])\s|^(?:requisit|crit[eé]rio|decis[aã]o|risco|contrato|interface|erro|falha|teste|arquivo)/i.test(s));
-  const chosen=(priority.length?priority:lines).filter(line=>!/^```|^\s*(?:package |import |public |private |class |return |export |function )/.test(line)).slice(0,cfg.mode==='aggressive'?8:16).join('\n');
-  return `[${a.stage} — extrato local, consulte artefato completo se necessário]\n${chosen.slice(0,limit)}`;
+ const selected=(artifacts||[]).filter(a=>['discovery','specification','architecture','review','qa'].includes(a.stage)).slice(-5);
+ const limit=cfg.mode==='aggressive'?500:cfg.mode==='balanced'?800:1100;
+ return selected.map(a=>{
+  const raw=String(a.text||'').replace(/```[^\n]*\n[\s\S]*?```/g,'[bloco de código omitido: consulte fonte canônica]');
+  const lines=raw.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  const relevant=lines.filter(l=>/^#{1,5}\s|^(?:[-*]|\d+[.)])\s|(?:requisito|critério|contrato|risco|decisão|falha|veredito|limitação)/i.test(l));
+  return `[${a.stage} — resumo de decisões, sem código]\n${(relevant.length?relevant:lines).slice(0,12).join('\n').slice(0,limit)}`;
  }).join('\n\n');
 }
 export function estimateTokens(text){return Math.ceil(String(text).length/4);} // approximation only

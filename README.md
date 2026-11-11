@@ -1,3 +1,7 @@
+# Ophiuchus Pilot 2.5.4
+
+Correção do contrato imutável de linguagem desde a criação da run. O contrato é persistido, enviado nas mensagens system e user de cada agente, registrado por etapa e validado antes da progressão em Discovery, Specification e Architecture. Rejeições de planejamento não consomem tentativas de correção de código e interrompem a execução assistida para diagnóstico.
+
 # Ophiuchus Pilot 0.8 — UI + control-plane inicial
 
 ## Frontend
@@ -194,3 +198,65 @@ Suporte a Node.js, Java, Go, Python, Rust e projetos C# de testes autocontidos. 
 - Contexto de código acima do limite seguro bloqueia a etapa com erro explícito, em vez de truncar silenciosamente.
 - O Docker continua sendo a fonte da evidência de execução; o parecer do QA é exibido separadamente.
 - Não há integração com preços de provedores nem telemetria de duração, portanto esses números não são mostrados.
+
+
+### Pilot 2.5.2 — COBOL
+- Contrato COBOL explícito, impede geração de JavaScript como fallback.
+- Testes COBOL no Docker via GnuCOBOL (`cobc -x -free`), sem rede e sem execução no host.
+- Imagem padrão `gnucobol/gnucobol:latest` **não validada neste ambiente**. Se não estiver disponível, configure `OPHIUCHUS_COBOL_IMAGE` para uma imagem GnuCOBOL verificada; o sistema deve falhar sem aprovar testes.
+- OAuth PKCE OpenRouter implementado (callback localhost, validação state, troca de código no backend, armazenamento criptografado no cofre). Outros provedores continuam com API key; não há OAuth universal.
+
+
+## Pilot 2.5.6: Docker COBOL e economia de contexto
+
+A imagem antiga `gnucobol/gnucobol:latest` não está disponível no Docker Hub.
+Construa uma imagem local uma vez (é necessário acesso à rede somente no build):
+
+```bash
+docker build -f docker/Dockerfile.gnucobol -t ophiuchus-gnucobol:local .
+```
+
+O executor usa `ophiuchus-gnucobol:local` por padrão ou `OPHIUCHUS_COBOL_IMAGE` se configurada.
+Se a imagem não existir, o Docker falhará e a run poderá prosseguir com revisão estática, **sem** alegar que os testes passaram.
+Falhas definitivas de imagem/repositório não são repetidas três vezes.
+
+O histórico enviado aos modelos contém resumos curtos das decisões sem copiar blocos de código; a fonte canônica completa é transmitida separadamente nas etapas que precisam dela. O objetivo é reduzir tokens de entrada, não alterar o código entregue.
+
+## Pilot 2.5.7 — Diagnóstico Docker e validação honesta
+
+- Antes do QA, o autopilot verifica o daemon Docker sem chamadas a modelos. Para COBOL também verifica a imagem local e inicia o compilador sob as mesmas restrições de segurança usadas pelo executor.
+- Para construir a imagem COBOL: `docker build -f docker/Dockerfile.gnucobol -t ophiuchus-gnucobol:local .`
+- COBOL usa `/tmp:rw,exec,nosuid,size=64m` para permitir executar os binários compilados. Rede desativada, rootfs somente leitura, usuário não privilegiado e limites permanecem.
+- Go encontra `go.mod` na raiz ou em subpastas e executa `go test -p 1 ./...` a partir de cada módulo, sem downloads de dependências.
+- O resultado de cada teste registra argumentos do Docker, imagem, duração, código de saída e saída (limitada a 64 KiB); os eventos do QA também registram esses dados.
+- Falhas definitivas de imagem interrompem novas tentativas. Erros de compilação ou de testes não autorizam fallback estático. Se a infraestrutura falhar, o fluxo segue com `dockerValidation.status=UNAVAILABLE` e revisão estática obrigatória, sem alegar que testes passaram.
+- Execute `npm run test:runtime` para verificar o runtime. O pré-diagnóstico Docker real requer Docker instalado na máquina do usuário; os testes unitários usam simulações controladas.
+
+## Pilot 2.5.7.1 — Correções de QA e Docker (11/11/2026)
+
+- Pré-diagnóstico COBOL com diretório temporário real do host (`os.tmpdir()`), compatível com Windows/Linux, e limpeza automática.
+- Smoke test efetivo: compila `smoke.cob` e executa binário com as mesmas restrições do executor (`--read-only`, `--network none`, usuário 65534, tmpfs `/tmp` com `exec`). Exige marcador `COBOL_SMOKE_OK` na saída.
+- Falhas Docker registram código de saída, sinal, timeout, saída e comando executado, inclusive quando a saída está vazia.
+- Antes do QA por IA, compilação sintática COBOL determinística (`cobc -fsyntax-only -free`) quando o Docker estiver disponível; erro de código retorna para correção, falha de infraestrutura ativa `STATIC_ONLY`.
+- `DOCKER_VERIFIED` exige status Docker `PASSED`, `qaVerified=true` e relatório de teste aprovado vinculado por ID.
+- Cache por hash SHA-256 dos arquivos de código para não repetir revisão/QA idênticos sem mudança nos arquivos; QA exige a mesma evidência Docker.
+- `STATIC_ONLY` permanece uma avaliação estática, sem afirmar testes executados.
+
+### Testes locais
+
+```powershell
+npm install
+npm run test:runtime
+node --input-type=module -e "import {dockerPreflight} from './runtime/test-runner.mjs'; console.log(JSON.stringify(await dockerPreflight({language:'cobol'}), null, 2))"
+npm run api
+```
+
+Em outro terminal: `npm run dev`.
+
+Se faltar a imagem COBOL:
+
+```powershell
+docker build -f docker/Dockerfile.gnucobol -t ophiuchus-gnucobol:local .
+```
+
+**Limites da validação desta entrega:** 94 testes de runtime passaram no ambiente de geração. Docker não está instalado nesse ambiente, portanto o smoke test real e o frontend no Windows precisam ser conferidos na máquina do usuário. O build de frontend requer `npm install` e não foi validado neste ambiente.

@@ -1,3 +1,4 @@
+import {googleAccessToken} from './google-oauth.mjs';
 /** Provider adapters; secrets remain in the backend. */
 import {getCredential,getCustomEndpoint} from './vault.mjs';
 export const PROVIDERS=Object.freeze([
@@ -26,7 +27,8 @@ const headers=(p)=>p.kind==='gemini'?{'x-goog-api-key':p.key}:p.kind==='anthropi
 export async function listModels(id,{env=process.env,fetchImpl=fetch,signal}={}){
  const p=resolveProvider(id,env);if(id==='mock')return [{id:'mock/offline',providerId:'mock',label:'Mock offline — sem custo'}];if(!p.configured)throw Error('Provedor não configurado no servidor');
  const path=p.kind==='anthropic'?'/models?limit=100':p.kind==='gemini'?'/models?pageSize=1000':'/models';
- const response=await fetchImpl(p.baseUrl+path,{headers:headers(p),signal});await checkResponse(response,p.name);
+ const googleToken=id==='google'?await googleAccessToken(env,fetchImpl):null;const requestHeaders=googleToken?{Authorization:`Bearer ${googleToken}`} : headers(p);
+ const response=await fetchImpl(p.baseUrl+path,{headers:requestHeaders,signal});await checkResponse(response,p.name);
  const json=await response.json();const models=p.kind==='gemini'?json.models:json.data;
  if(!Array.isArray(models))throw Error('Catálogo inválido');
  return models.filter(m=>typeof m.name==='string'||typeof m.id==='string').filter(m=>p.kind!=='gemini'||m.supportedGenerationMethods?.includes('generateContent')).map(m=>({id:p.kind==='gemini'?m.name.replace(/^models\//,''):m.id,providerId:id,label:m.displayName||m.name||m.id})).sort((a,b)=>a.id.localeCompare(b.id));
@@ -46,7 +48,8 @@ export async function generateText({providerId,model,messages,maxOutputTokens=60
  }else if(p.kind==='anthropic'){
   url=p.baseUrl+'/messages';body={model,max_tokens:maxOutputTokens,messages:messages.filter(m=>m.role!=='system').map(m=>({role:m.role,content:m.content})),system:messages.filter(m=>m.role==='system').map(m=>m.content).join('\n')};
  }else{url=p.baseUrl+'/chat/completions';body={model,messages,max_tokens:maxOutputTokens};}
- const response=await fetchImpl(url,{method:'POST',headers:{...headers(p),'Content-Type':'application/json'},body:JSON.stringify(body),signal});await checkResponse(response,p.name);
+ const googleToken=providerId==='google'?await googleAccessToken(env,fetchImpl):null;const requestHeaders=googleToken?{Authorization:`Bearer ${googleToken}`} : headers(p);
+ const response=await fetchImpl(url,{method:'POST',headers:{...requestHeaders,'Content-Type':'application/json'},body:JSON.stringify(body),signal});await checkResponse(response,p.name);
  const json=await response.json();let text='',finishReason=null,usage=null;
  if(p.kind==='gemini'){
   const candidate=json.candidates?.[0];text=(candidate?.content?.parts||[]).filter(x=>typeof x.text==='string'&&!x.thought).map(x=>x.text).join('\n');

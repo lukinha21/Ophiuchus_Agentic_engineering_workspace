@@ -1,0 +1,5 @@
+# Build once on a machine with Docker registry and Debian package access.
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends gnucobol ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+RUN cobc --version

@@ -1,3 +1,4 @@
+import {stackContract} from './stack-contract.mjs';
 /** Ophiuchus control-plane prototype. No LLM or tool execution is implied. */
 export const STAGES = Object.freeze(['discovery','specification','architecture','implementation','review','qa','delivery']);
 export const ROLES = Object.freeze({discovery:'orchestrator',specification:'architect',architecture:'architect',implementation:'developer',review:'reviewer',qa:'qa',delivery:'documentation'});
@@ -25,10 +26,10 @@ const MAX_PER_STAGE = 2;
 export function createRun({id, prompt, agents}) {
   if (!id || !prompt?.trim()) throw new Error('id e prompt obrigatórios');
   if (!Array.isArray(agents) || !agents.some(a=>a.role==='ORCHESTRATOR' && a.enabled)) throw new Error('Orquestrador ativo obrigatório');
-  return {id,prompt,createdAt:new Date().toISOString(),status:'RUNNING',stage:'discovery',corrections:0,correctionsByStage:{},configSnapshot:structuredClone(agents),history:[],events:[],artifacts:[],subtasks:{},approval:null};
+  return {id,prompt,languageContract:stackContract(prompt),createdAt:new Date().toISOString(),status:'RUNNING',stage:'discovery',corrections:0,correctionsByStage:{},configSnapshot:structuredClone(agents),history:[],events:[],artifacts:[],subtasks:{},approval:null};
 }
 export function emit(run,type,payload={}) {const event={id:`${run.id}:${run.events.length+1}`,at:new Date().toISOString(),type,stage:run.stage,...payload};run.events.push(event);return event;}
-export function startRun(run) {emit(run,'run.started',{message:'Run iniciado com configuração congelada'});emit(run,'stage.started',{role:ROLES[run.stage]});return run;}
+export function startRun(run) {run.languageContract??=stackContract(run.prompt);emit(run,'contract.language.resolved',{language:run.languageContract.language,tests:run.languageContract.tests,extensions:run.languageContract.extensions});emit(run,'run.started',{message:'Run iniciado com configuração congelada'});emit(run,'stage.started',{role:ROLES[run.stage]});return run;}
 export function completeStage(run,{artifact=null}={}) {
   if(run.status!=='RUNNING') throw new Error('Run não está executando');
   if(artifact){run.artifacts.push({stage:run.stage,...artifact});recordStageEvidence(run,run.stage,artifact);}
@@ -39,14 +40,23 @@ export function completeStage(run,{artifact=null}={}) {
   if(!next){run.status='SUCCESS';emit(run,'run.completed');return run;}
   run.stage=next;emit(run,'handoff.created',{to:ROLES[next]});emit(run,'stage.started',{role:ROLES[next]});return run;
 }
+export function hasPassingDockerEvidence(run){return run.dockerValidation?.status==='PASSED' && run.autoPilot?.qaVerified===true && (run.testResults||[]).some(t=>t.id===run.autoPilot.qaTestResultId && t.passed===true);}
 function checkpoint(run,kind,resume){
  const autonomy=run.executionOptions?.autonomy||'supervised';
  const automatic=autonomy==='autonomous'||(autonomy==='semi'&&kind==='specification_review');
  // Only AI-produced, non-truncated artifacts qualify for automatic decisions.
  const current=run.artifacts.at(-1);
  const evidence=Boolean(current&&current.stage===run.stage&&current.text?.trim()&&current.integrity!=='incomplete'&&current.providerId!=='mock');
- if(automatic&&evidence){
-  emit(run,'approval.auto',{kind,policy:autonomy,note:'Validação documental apenas; nenhum teste de código foi executado'});
+ if(kind==='merge_approval' && run.dockerValidation?.status==='UNAVAILABLE'){
+  run.deliveryValidation={level:'STATIC_ONLY',docker:'UNAVAILABLE',warning:'Entrega baseada em revisão estática de IA. Testes automáticos Docker não foram concluídos; comportamento não verificado por execução.'};
+  emit(run,'delivery.validation.partial',{summary:run.deliveryValidation.warning});
+ }
+ if(kind==='merge_approval' && hasPassingDockerEvidence(run)){run.deliveryValidation={level:'DOCKER_VERIFIED',docker:'PASSED',testResultId:run.autoPilot.qaTestResultId};}
+ if(kind==='merge_approval' && !hasPassingDockerEvidence(run) && run.dockerValidation?.status!=='UNAVAILABLE'){
+  run.status='WAITING_APPROVAL';run.approval={kind,resume};emit(run,'approval.requested',{kind,reason:'Testes Docker sem aprovação; entrega automática não autorizada'});return run;
+ }
+ if(automatic&&evidence && (kind!=='merge_approval'||(run.qaAssessment?.status==='PASS'&&(hasPassingDockerEvidence(run)||run.dockerValidation?.status==='UNAVAILABLE')))){
+  emit(run,'approval.auto',{kind,policy:autonomy,note:kind==='merge_approval'?(hasPassingDockerEvidence(run)?'Testes Docker aprovados com evidência vinculada':'Aprovação documental STATIC_ONLY; sem testes executados'):'Aprovação da especificação'});
   run.stage=resume;emit(run,'handoff.created',{to:ROLES[resume]});emit(run,'stage.started',{role:ROLES[resume]});return run;
  }
  run.status='WAITING_APPROVAL';run.approval={kind,resume};emit(run,'approval.requested',{kind,reason:automatic?'Evidência real insuficiente para aprovação automática':'Política supervisionada'});return run;

@@ -1,0 +1,15 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {EventEmitter} from 'node:events';
+import {PassThrough} from 'node:stream';
+import {cobolDockerArgs,languageDockerArgs,classifyTestFailure,retryableInfrastructureFailure,dockerPreflight,executeDocker} from './test-runner.mjs';
+import {autopilotStep} from './autopilot.mjs';
+import {createRun,startRun} from './orchestrator.mjs';
+function fakeSpawn({code=0,output='ok'}={}){return (_bin,_args)=>{const p=new EventEmitter();p.stdout=new PassThrough();p.stderr=new PassThrough();p.kill=()=>{};queueMicrotask(()=>{p.stdout.write(output);p.emit('close',code,null);});return p;};}
+test('COBOL tmpfs allows execution and retains sandbox constraints',()=>{const args=cobolDockerArgs('/tmp',['src/a.cob','tests/test_a.cob'],['tests/test_a.cob']);assert.ok(args.includes('/tmp:rw,exec,nosuid,size=64m'));assert.ok(args.includes('--read-only'));assert.ok(args.includes('--network'));assert.match(args.at(-1),/\/tmp\/cobol_test_0/);});
+test('Go detects nested go.mod and tests all modules',()=>{const args=languageDockerArgs('/tmp','go',['src/a_test.go'],{files:[{path:'src/go.mod'},{path:'pkg/go.mod'}]});assert.match(args.at(-1),/cd '\/workspace\/src'/);assert.match(args.at(-1),/cd '\/workspace\/pkg'/);assert.equal((args.at(-1).match(/go test -p 1/g)||[]).length,2);});
+test('Go requires module when workspace listing is supplied',()=>assert.throws(()=>languageDockerArgs('/tmp','go',['src/a_test.go'],{files:[{path:'src/a_test.go'}]}),/go.mod/));
+test('Docker code exit 1 remains code failure; docker exit 125 infrastructure',()=>{assert.equal(classifyTestFailure({exitCode:1,output:'sh: /tmp/test: Permission denied'}),'code');assert.equal(classifyTestFailure({exitCode:125,output:'docker: invalid mount config'}),'infrastructure');assert.equal(retryableInfrastructureFailure({output:'manifest unknown'}),false);});
+test('Docker execution captures command outcome and complete error',async()=>{const r=await executeDocker(['version'],{spawnImpl:fakeSpawn({code:125,output:'docker: invalid mount config'})});assert.equal(r.exitCode,125);assert.match(r.output,/invalid mount/);assert.ok(r.durationMs>=0);});
+test('preflight verifies daemon, local image and COBOL sandbox',async()=>{let count=0;const spawnImpl=(bin,args)=>{count++;return fakeSpawn({output:args[0]==='run'?'COBOL_SMOKE_OK':'ok'})(bin,args);};const r=await dockerPreflight({language:'cobol'},{spawnImpl});assert.equal(r.ok,true);assert.equal(count,3);});
+test('failed preflight does not run Docker tests or consume code corrections',async()=>{const r=startRun(createRun({id:'pilot257',prompt:'crie em COBOL',agents:[{role:'ORCHESTRATOR',enabled:true}]}));r.stage='qa';r.autoPilot={qaVerified:false};let tested=0,executed=0;await autopilotStep(r,{runTests:true,maxDockerAttempts:3},{list:async()=>[{path:'tests/test_a.cob'}],test:async()=>{tested++;},preflight:async()=>({ok:false,reason:'Docker daemon offline'}),execute:async()=>{executed++;}});assert.equal(tested,0);assert.equal(executed,1);assert.equal(r.dockerValidation.status,'UNAVAILABLE');assert.equal(r.corrections,0);});

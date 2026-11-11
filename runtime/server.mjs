@@ -1,3 +1,4 @@
+import {googleOAuthConfig,exchangeGoogleCode} from './google-oauth.mjs';
 import {stackContract} from './stack-contract.mjs';
 /** Local-only control-plane API. No credentials, tools, or provider calls. */
 import http from 'node:http';
@@ -49,6 +50,22 @@ const server=http.createServer(async(req,res)=>{
   const credentialMatch=url.pathname.match(/^\/vault\/credentials\/(openai|openrouter|google|anthropic|custom)$/);
   if(credentialMatch&&req.method==='PUT'){const body=await readBody(req);await saveCredential(credentialMatch[1],body.key);return json(res,200,{ok:true});}
   if(credentialMatch&&req.method==='DELETE'){await removeCredential(credentialMatch[1]);return json(res,200,{ok:true});}
+  if(req.method==='POST'&&url.pathname==='/oauth/openrouter/exchange'){
+   if(!(await vaultStatus()).unlocked)return json(res,409,{error:'Desbloqueie o cofre antes de conectar OpenRouter'});
+   const {code,verifier}=await readBody(req);
+   if(typeof code!=='string'||code.length<8||code.length>2048||typeof verifier!=='string'||!/^[A-Za-z0-9_~-]{43,128}$/.test(verifier))return json(res,400,{error:'Código OAuth ou verificador PKCE inválido'});
+   const response=await fetch('https://openrouter.ai/api/v1/auth/keys',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code,code_verifier:verifier,code_challenge_method:'S256'}),signal:AbortSignal.timeout(15000)});
+   if(!response.ok)return json(res,502,{error:`OpenRouter recusou a autorização (HTTP ${response.status}). Refaça a conexão.`});
+   const data=await response.json();
+   if(typeof data.key!=='string'||!data.key.startsWith('sk-or-'))throw Error('OpenRouter não retornou chave válida');
+   await saveCredential('openrouter',data.key);
+   return json(res,200,{ok:true,provider:'openrouter'});
+  }
+  if(req.method==='GET'&&url.pathname==='/oauth/google/config')return json(res,200,googleOAuthConfig());
+  if(req.method==='POST'&&url.pathname==='/oauth/google/exchange'){
+   if(!(await vaultStatus()).unlocked)return json(res,409,{error:'Desbloqueie o cofre antes de conectar Google'});
+   return json(res,200,await exchangeGoogleCode(await readBody(req)));
+  }
   if(req.method==='GET'&&url.pathname==='/execution-options')return json(res,200,executionOptions);
   if(req.method==='PUT'&&url.pathname==='/execution-options'){executionOptions=normalizeOptions(await readBody(req));await saveOptions();return json(res,200,executionOptions);}
   if(req.method==='GET'&&url.pathname==='/bindings')return json(res,200,bindings);

@@ -8,3 +8,9 @@ test('QA JSON puro, fence e texto com objeto',()=>{
 test('QA não inventa aprovação de prosa e rejeita objeto incompleto',()=>{
  for(const t of ['Aprovado!','{"verdict":"pass"}','{"verdict":"pass","kind":"code","summary":"ok","evidence":""}'])assert.throws(()=>interpretQA(t),/JSON válido/);
 });
+
+test('QA accepts literal newlines and tabs inside JSON strings without inventing approval',()=>{
+ const malformed='```json\n{"verdict":"pass","kind":"code","summary":"Testes executaram\n com sucesso","evidence":"Docker\t exit 0"}\n```';
+ assert.deepEqual(interpretQA(malformed),{verdict:'pass',kind:'code',summary:'Testes executaram\n com sucesso',evidence:'Docker\t exit 0'});
+ assert.throws(()=>interpretQA('{"verdict":"pass","summary":"x\ny"}'),/JSON válido/);
+});

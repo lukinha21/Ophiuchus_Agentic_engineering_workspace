@@ -1,1 +1,18 @@
 .auto-panel{margin:20px 0;padding:20px;border:1px solid #47406c;border-radius:18px;background:linear-gradient(135deg,#19172d,#101624);color:#eae8ff;flex-shrink:0}.auto-heading{display:flex;align-items:center;gap:12px}.auto-heading>svg{color:#a88bff}.auto-heading>div{display:grid;gap:4px;flex:1}.auto-heading strong{font-size:15px}.auto-heading small,.auto-foot{color:#a7a4c3;font-size:12px}.auto-status{border:1px solid #504778;border-radius:8px;padding:5px 8px;font-size:10px;color:#bdaaff}.auto-metrics{display:flex;gap:10px;margin:17px 0;flex-wrap:wrap}.auto-metrics span{border:1px solid #35334f;background:#17182b;border-radius:9px;padding:9px 12px;font-size:12px}.auto-metrics b{margin-left:8px;color:#e7dcff}.auto-settings{display:grid;gap:12px}.auto-settings>label{display:flex;align-items:center;gap:10px;font-size:13px}.auto-settings input[type=checkbox]{accent-color:#8358ee}.auto-limits{display:flex;gap:16px;flex-wrap:wrap}.auto-limits label{display:grid;gap:5px;font-size:12px;color:#bdb9d5}.auto-limits input{width:145px;background:#101426;border:1px solid #4a4265;border-radius:7px;color:white;padding:9px}.auto-panel button{display:inline-flex;gap:9px;align-items:center;justify-content:center;width:max-content;background:#6340b3;border:1px solid #8063d0;border-radius:9px;padding:11px 16px;color:white;cursor:pointer}.auto-panel button:disabled{opacity:.4;cursor:not-allowed}.auto-foot{display:flex;gap:8px;align-items:flex-start;line-height:1.6;margin:14px 0 0}.auto-message{display:flex;gap:8px;align-items:center;color:#ffc39b;font-size:12px;line-height:1.5}
+
+/* Pilot 2.5.1: controls outside the conversation */
+.ophi-cycle-backdrop{position:fixed;inset:0;z-index:1500;background:rgba(5,7,17,.76);backdrop-filter:blur(8px);display:flex;justify-content:center;align-items:center;padding:22px}
+.ophi-cycle-dialog{position:relative;width:min(680px,100%);max-height:min(88vh,850px);overflow-y:auto;border:1px solid #554b7b;border-radius:22px;background:#121326;box-shadow:0 25px 90px #0009;padding:12px}
+.ophi-cycle-dialog .auto-panel{margin:0;border:0;background:transparent;padding:26px 20px 18px}
+.ophi-cycle-close{position:absolute;top:13px;right:15px;z-index:2;background:#27223f;border:1px solid #554b7b;border-radius:9px;padding:8px;color:#eee;cursor:pointer}
+.auto-mode-switch{display:flex;gap:8px;background:#101021;padding:6px;border-radius:12px}
+.auto-panel .auto-mode-switch button{flex:1;width:auto;background:transparent;border-color:transparent;color:#aaa4c9}
+.auto-panel .auto-mode-switch button.selected{background:#503a87;border-color:#7b61c2;color:#fff}
+.auto-standard{border:1px solid #3b345c;background:#1a1930;border-radius:12px;padding:15px;font-size:13px;line-height:1.6;color:#bdb9d5}
+.auto-standard strong{color:#f2edff}.auto-standard p{margin:8px 0 0}
+.ophi-cycle-empty{text-align:center;padding:45px 24px;color:#dfd7fa}.ophi-cycle-empty svg{color:#ac91ff}.ophi-cycle-empty p{color:#aaa4c9}.ophi-cycle-empty button{background:#6340b3;color:white;border:0;border-radius:9px;padding:10px 20px;cursor:pointer}
+.ophi-workspace-toggle{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:14px 0 6px;flex-shrink:0}
+.ophi-workspace-toggle>button{display:flex;align-items:center;gap:9px;background:#1b1b32;border:1px solid #50436f;border-radius:11px;color:#e5dcff;padding:11px 15px;cursor:pointer;font-weight:600}
+.ophi-workspace-toggle>span{font-size:12px;color:#9c98b7}
+.ophi-chevron-open{transform:rotate(180deg)}
+@media(max-width:650px){.ophi-cycle-dialog{padding:6px}.ophi-cycle-dialog .auto-panel{padding:36px 12px 12px}.auto-metrics{gap:6px}.auto-limits{gap:8px}}
