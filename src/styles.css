@@ -38,3 +38,11 @@ body{min-width:900px;background:#0b0c15}
 .optimization-options h3,.optimization-options p{margin:0}.optimization-options label{display:grid;gap:7px;font-size:13px;color:#c9c9dc}
 .optimization-options input,.optimization-options select{width:100%;max-width:480px;background:#171725;color:#f0efff;border:1px solid #49465e;border-radius:9px;padding:10px}
 .optimization-options small{color:#aaa9bc;line-height:1.5}
+
+/* Credential vault */
+.vault-panel{background:#111725;border:1px solid #574b80;border-radius:12px;padding:15px;margin:16px 0}.vault-panel>strong{display:flex;gap:8px;align-items:center;color:#d9ceff;font-size:13px}.vault-row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.vault-row input{flex:1;min-width:170px;padding:11px;border-radius:8px;background:#0d1020;color:#eee;border:1px solid #4d416c}.vault-row button,.vault-actions button{background:#55418c;color:#fff;border:1px solid #7966ac;border-radius:8px;padding:10px 13px;font-size:11px}.vault-row button:disabled,.vault-actions button:disabled{opacity:.45}.vault-status{display:flex;align-items:center;gap:7px;color:#92e6c1;font-size:12px}.vault-actions{display:flex;gap:9px;margin-top:10px;flex-wrap:wrap}
+
+.vault-select{width:100%;padding:11px;border:1px solid #564a76;border-radius:8px;background:#151728;color:#eee}
+/* Pilot 2.5: expandable real model rows */
+.model-row { flex-wrap: wrap; }
+.model-row:hover { opacity: .88; }

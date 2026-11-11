@@ -122,3 +122,75 @@ Com `OPENAI_API_KEY` no ambiente do servidor e modelos configurados na aba Prove
 - O resultado dos testes é salvo na run com evento e saída limitada a 32 KB. Se houver falhas, o usuário pode autorizar a devolução ao Desenvolvedor; não ocorre reexecução automática de IA nem gasto automático.
 - Ações de escrita continuam exigindo aprovação explícita. Os testes não podem editar o workspace.
 - Não há suporte ainda a dependências npm, testes de navegador, CI ou execução de projetos de outras linguagens.
+
+## Pilot 1.9 — geração de testes, editor e ciclo de correção
+
+- O prompt de implementação solicita arquivos de código **e** testes `node:test`, além de `package.json` quando necessário. A geração depende da resposta do modelo; o sistema não inventa arquivos ausentes.
+- O painel Workspace oferece **Criar arquivo de teste** e **Editar**, com confirmação explícita antes de salvar. Arquivos são limitados e validados pelo backend.
+- A comparação de propostas agora mostra linhas adicionadas e removidas, com limite para diffs grandes.
+- Quando uma execução Docker falha e o usuário autoriza **devolução ao Desenvolvedor** em uma run ainda RUNNING, a próxima chamada de implementação recebe o relatório real de falha, com saída limitada a 5.000 caracteres.
+- Os testes continuam exigindo autorização humana, Docker e imagem `node:22-alpine`. Não há execução automática nem instalação de dependências.
+- Limitação: o retorno para correção requer run RUNNING. Uma run SUCCESS não pode ser reaberta neste piloto. Não há validação automática de cobertura nem aprovação automática baseada em Docker.
+
+
+## Pilot 2.0 — Experiência visual do Workspace
+
+- Workspace reorganizado com abas Arquivos e Testes, listas com ícones, editor em destaque e diffs coloridos.
+- Artefatos de agentes com cabeçalho, metadados separados, Markdown e blocos de código.
+- O botão **Novo teste** abre um exemplo útil para `isPrime`, em vez de `1 + 1 === 2`; ajuste o caminho e o conteúdo conforme seu projeto.
+- O sistema alerta quando existe `example.test.js`, que não valida o código da aplicação.
+- **Para testar retorno ao Desenvolvedor sem API:** crie uma run Mock, avance até review ou QA, grave uma implementação defeituosa e um teste que falhe, execute o Docker na aba Testes, e autorize a devolução. O Mock verifica o roteamento, mas não corrige o código.
+- O workspace e o estado da run são separados por ID. Uma run antiga não pode ser reaberta após SUCCESS.
+- Não foram adicionadas chamadas de API, dependências ou permissões de execução automáticas.
+
+
+## Pilot 2.0.1 — correção do Workspace oculto
+
+Corrigida a compressão vertical de `.ophi-files` no layout flex do Console.
+O painel não pode encolher para 2px, e a rolagem continua no centro do Console.
+Arquivos, Testes, editor e comparação permanecem acessíveis dentro do painel.
+
+## Pilot 2.2 — Ciclo assistido com autorização por run
+
+No Console, abra **Ciclo assistido**. Autorize separadamente a gravação automática de arquivos propostos e a execução de testes no Docker. A aprovação automática de checkpoints é opcional. Configure limites de chamadas e tokens, depois clique em **Iniciar ciclo autorizado**. O botão **Pausar** interrompe o ciclo após a operação atual; não cancela uma chamada de IA já em andamento. O estado aparece no próprio painel e no histórico.
+
+O ciclo executa os agentes em sequência, aplica as propostas de implementação autorizadas, exige ao menos um arquivo de teste, executa `node --test` em Docker quando chega ao QA e devolve falhas reais ao Desenvolvedor (até os limites do Orquestrador). A entrega não recebe aprovação automática sem evidência de testes reais aprovados. No modo Mock, a automação pausa sem gerar arquivos ou alegar validação. Erros HTTP 429, timeout, respostas incompletas, Docker indisponível e ausência de testes pausam o ciclo, sem fingir sucesso.
+
+**Limitações:** o QA automatizado ainda executa apenas testes JavaScript; a existência de testes aprovados não comprova cobertura, segurança ou conformidade integral. As permissões são concedidas por run e são amplas para arquivos propostos dentro do workspace isolado; use apenas modelos e pedidos confiáveis. O limite de tokens é aproximado e pode ser ultrapassado por uma chamada em andamento. Não há orçamento financeiro garantido, nem retomada automática após reiniciar o servidor. Testes não são executados no host.
+
+## Pilot 2.2 — Conexões de IA sem terminal
+
+Em **Configurações → Provedores**, crie um cofre local com senha mestra de no mínimo 12 caracteres, desbloqueie-o e salve a API key de cada provedor. O cofre é criptografado com AES-256-GCM e chave derivada com scrypt; as chaves não são retornadas pela API e não são salvas no navegador. O arquivo fica em `.ophiuchus-local/credentials.enc`, excluído do Git. Após reiniciar a API, desbloqueie o cofre na interface para voltar a usar as chaves. Se perder a senha mestra, não há recuperação das chaves armazenadas.
+
+Adaptadores reais: OpenAI, OpenRouter, Google Gemini (API nativa `generateContent`) e Anthropic Claude (API nativa `messages`). Mock continua offline. Custom OpenAI-compatible permite selecionar Groq, Together, Fireworks, DeepSeek, Mistral ou Cerebras, com HTTPS pré-aprovado; configure a chave customizada separadamente. Variáveis de ambiente continuam como fallback opcional. Não existe login OAuth nesta versão.
+
+**Importante:** a API local deve permanecer em `127.0.0.1` e o Vite é apenas para desenvolvimento local. Não publique a API ou o Vite na rede/internet, nem compartilhe a pasta `.ophiuchus-local`. As chaves ficam disponíveis em memória enquanto o cofre estiver desbloqueado. As requisições podem ter custos no provedor. O botão Consultar modelos faz uma chamada à API do provedor, mas não gera texto. A descoberta de modelos depende das permissões da chave e da disponibilidade do catálogo. Uma assinatura de chat não substitui créditos de API.
+
+
+## Pilot 2.3 — contrato de linguagem e testes Java
+- A solicitação original define um contrato determinístico de linguagem, propagado a todos os agentes.
+- Para pedidos Java, propostas com JS/Node/package.json são rejeitadas antes de gravar arquivos.
+- Java é compilado com javac e testado via classes `*Test.java` com `public static void main`, sem dependências de rede, em Docker JDK 21.
+- A imagem Docker `eclipse-temurin:21-jdk` precisa estar baixada previamente (`docker pull eclipse-temurin:21-jdk`), pois o contêiner roda sem rede.
+- JUnit/Maven com dependências externas ainda não são suportados no runner offline.
+- Python, C# e Go não usam fallback JavaScript: testes são bloqueados até existir runner próprio.
+- Uma run anterior não muda seu contrato nem seus arquivos automaticamente: crie uma nova run.
+
+## Pilot 2.4 — executor Docker multilíngue
+
+Suporte a Node.js, Java, Go, Python, Rust e projetos C# de testes autocontidos. O Docker baixa automaticamente a imagem correspondente **na primeira execução** (`--pull missing`); não é necessário executar `docker pull` manualmente. Docker Engine deve estar instalado e funcionando. Cada execução requer autorização na interface ou política autorizada de ciclo. Contêiner sem rede, sem privilégios, com workspace somente leitura e limites de recursos. O daemon Docker precisa de internet na primeira obtenção da imagem; execução dentro do contêiner permanece sem rede. Bibliotecas externas não são baixadas durante os testes. Projetos C# dependentes de pacotes NuGet e suítes xUnit/NUnit/MSTest externas ainda não são suportados offline; use projetos de teste console autocontidos. Python usa `unittest`; Go usa `go test`; Rust usa `cargo test --offline`. O executor não garante isolamento absoluto de código hostil.
+
+
+## Pilot 2.4.1 — QA e evidência real
+- Parser de QA aceita JSON puro, cercado por Markdown e envolvido em texto, sem inferir aprovação de texto livre.
+- Respostas inválidas são registradas no estado de diagnóstico do QA; ciclo pausa em vez de avançar.
+- QA do modelo e resultados Docker são indicadores separados. Aprovação automática de entrega exige ambos.
+- Autorização de testes indica a linguagem detectada, em vez de JavaScript fixo.
+- As imagens multilíngues do Pilot 2.4 foram preservadas.
+
+## Pilot 2.5 — contexto íntegro e dashboard real
+- Dashboard usa `GET /api/metrics?days=1|7|30` sobre runs persistidas; não exibe dados fictícios nem inventa preços/latência.
+- Histórico compactado continua econômico, mas review/QA recebem arquivos integrais da implementação em um bloco separado, com SHA-256, bytes e origem (disco ou proposta).
+- Contexto de código acima do limite seguro bloqueia a etapa com erro explícito, em vez de truncar silenciosamente.
+- O Docker continua sendo a fonte da evidência de execução; o parecer do QA é exibido separadamente.
+- Não há integração com preços de provedores nem telemetria de duração, portanto esses números não são mostrados.

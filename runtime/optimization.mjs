@@ -17,7 +17,7 @@ export function compactHistory(artifacts,options){
   // Extract structural highlights; deterministic and free. No invented summary.
   const lines=raw.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
   const priority=lines.filter(s=>/^#{1,5}\s|^(?:[-*]|\d+[.)])\s|^(?:requisit|crit[eé]rio|decis[aã]o|risco|contrato|interface|erro|falha|teste|arquivo)/i.test(s));
-  const chosen=(priority.length?priority:lines).slice(0,cfg.mode==='aggressive'?8:16).join('\n');
+  const chosen=(priority.length?priority:lines).filter(line=>!/^```|^\s*(?:package |import |public |private |class |return |export |function )/.test(line)).slice(0,cfg.mode==='aggressive'?8:16).join('\n');
   return `[${a.stage} — extrato local, consulte artefato completo se necessário]\n${chosen.slice(0,limit)}`;
  }).join('\n\n');
 }
