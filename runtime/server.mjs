@@ -159,7 +159,7 @@ const server=http.createServer(async(req,res)=>{
    try{await executeStage(run);await save();return json(res,200,run);}
    finally{executing.delete(run.id);}
   }
-  if(match[2]==='cancel'&&autopiloting.has(run.id))autoStops.add(run.id);
+  if(match[2]==='cancel'){autoStops.add(run.id);cancel(run);await save();return json(res,200,run);}
   if(executing.has(run.id)||testing.has(run.id)||autopiloting.has(run.id))return json(res,409,{error:'Aguarde a operação terminar'});
   switch(match[2]){
    case 'discard-draft':run.pendingDraft=null;break;

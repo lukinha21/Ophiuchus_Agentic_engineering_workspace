@@ -1,3 +1,4 @@
+import {checkCobolSources} from './cobol-static.mjs';
 /** Deterministic language contract: user request outranks generated prose. */
 export function stackContract(prompt=''){
  const p=String(prompt);
@@ -18,7 +19,7 @@ export function stackContract(prompt=''){
   ['fortran',/\b(?:fortran)\b/i,['.f90','.f95','.f']],
   ['pascal',/\b(?:pascal|delphi)\b/i,['.pas']],
   ['cpp',/(?:\bc\+\+(?!\w)|\bcpp\b)/i,['.cpp','.cc','.hpp']],
-  ['c',/\b(?:linguagem\s+c(?!\+)|em\s+c(?!\+)|c\s+language)\b/i,['.c','.h']],
+  ['c',/\b(?:linguagem\s+c(?![+#])|em\s+c(?![+#])|c\s+language)\b/i,['.c','.h']],
   ['sql',/\b(?:sql|postgresql|plpgsql)\b/i,['.sql']],
   ['shell',/\b(?:bash|shell\s+script|powershell)\b/i,['.sh','.ps1']],
  ];
@@ -28,7 +29,7 @@ export function stackContract(prompt=''){
  // Future/unknown languages: retain the requested name and fail closed instead of silently choosing JS.
  const unknown=p.match(/\b(?:linguagem|language)\s+(?:de\s+programa(?:ção|cao)\s+)?([A-Za-z][A-Za-z0-9+#.-]{1,30})/i);
  if(unknown&&!/^(?:para|que|mais|natural|original|solicitada|escolhida|principal|do|da|de|em|com|e|ou)$/i.test(unknown[1])){
-  const language=unknown[1].toLowerCase();if(!['javascript','node.js'].includes(language))return {language,tests:'unsupported',extensions:[]};
+  const language=unknown[1].toLowerCase();if(!['javascript','node.js','cobol','gnucobol','java','python','csharp','rust','go'].includes(language))return {language,tests:'unsupported',extensions:[]};
  }
 
  if(/\b(cobol|gnucobol|\.cob|\.cbl)\b/i.test(p))return {language:'cobol',tests:'cobol',extensions:['.cob','.cbl']};
@@ -39,31 +40,32 @@ export function stackContract(prompt=''){
  if(/\b(golang|em\s+go|go language|go\s+(?:api|app|programa|função|funcao|projeto|service|serviço|codigo|código))/i.test(p))return {language:'go',tests:'go',extensions:['.go']};
  return {language:'javascript',tests:'node',extensions:['.js','.mjs','.cjs']};
 }
-export function validateProposals(proposals,contract){
+export function validateProposals(proposals,contract,{partial=false}={}){
  if(!proposals?.length)return {ok:false,reason:'Nenhum arquivo de código proposto'};
  const paths=proposals.map(p=>p.path);
  if(contract.language==='java'){
   const wrong=paths.filter(p=>/\.(?:js|mjs|cjs|ts|tsx)$/.test(p)||/(^|\/)package\.json$/.test(p));
   if(wrong.length)return {ok:false,reason:`Contrato Java violado: arquivos incompatíveis (${wrong.join(', ')}). Gere somente .java e testes *Test.java.`};
   if(!paths.some(p=>p.endsWith('.java')))return {ok:false,reason:'Contrato Java exige código .java'};
-  if(!paths.some(p=>/Test\.java$/.test(p)))return {ok:false,reason:'Contrato Java exige ao menos um *Test.java executável com public static void main(String[] args)'};
+  if(!partial&&!paths.some(p=>/Test\.java$/.test(p)))return {ok:false,reason:'Contrato Java exige ao menos um *Test.java executável com public static void main(String[] args)'};
  }
  if(contract.language==='cobol'){
+  const staticCheck=checkCobolSources(proposals);if(!staticCheck.ok)return staticCheck;
   const wrong=paths.filter(path=>/\.(?:js|mjs|cjs|ts|tsx|py|java|go|rs|cs)$/.test(path)||/(^|\/)package\.json$/.test(path));
   if(wrong.length)return {ok:false,reason:`Contrato COBOL violado: ${wrong.join(', ')}. Não crie wrappers JavaScript.`};
   if(!paths.some(path=>/\.(cob|cbl)$/i.test(path)))return {ok:false,reason:'Contrato COBOL exige um arquivo .cob ou .cbl'};
-  if(!paths.some(path=>/(test|teste|spec)[^/]*\.(cob|cbl)$/i.test(path)))return {ok:false,reason:'Contrato COBOL exige teste executável test*.cob ou teste*.cob'};
+  if(!partial&&!paths.some(path=>/(test|teste|spec)[^/]*\.(cob|cbl)$/i.test(path)))return {ok:false,reason:'Contrato COBOL exige teste executável test*.cob ou teste*.cob'};
  }
  if(['go','python','rust','csharp'].includes(contract.language)||contract.tests==='unsupported'){
   const wrong=paths.filter(path=>/\.(?:js|mjs|cjs|ts|tsx)$/.test(path)||/(^|\/)package\.json$/.test(path));
   if(wrong.length)return {ok:false,reason:`Contrato ${contract.language} violado: ${wrong.join(', ')}`};
-  if(!paths.some(path=>contract.extensions.some(ext=>path.endsWith(ext))))return {ok:false,reason:`Contrato ${contract.language}: nenhum arquivo fonte compatível`};
+  if(!partial&&!paths.some(path=>contract.extensions.some(ext=>path.endsWith(ext))))return {ok:false,reason:`Contrato ${contract.language}: nenhum arquivo fonte compatível`};
  }
  return {ok:true};
 }
 export function stageContractInstructions(contract){
- if(contract.language==='cobol')return 'CONTRATO OBRIGATÓRIO: COBOL/GnuCOBOL. A linguagem do pedido é COBOL, não JavaScript. Gere código COBOL em blocos ```cobol file:src/sorteio.cob e teste COBOL executável em ```cobol file:tests/test_sorteio.cob. Use formato livre (>>SOURCE FORMAT FREE), PROCEDURE DIVISION, FUNCTION RANDOM, testes determinísticos com condição de erro e RETURN-CODE diferente de zero em falha. O teste deve verificar limites de 1 a 500. Não use Node.js, npm, JavaScript, wrappers, dependências externas ou testes simulados. Não substitua a linguagem original.';
- if(contract.language==='java')return 'CONTRATO OBRIGATÓRIO: JAVA (não JavaScript/Node). Produza exclusivamente arquivos .java em blocos ```java file:src/LotteryUtils.java. Inclua pelo menos um *Test.java autocontido com public static void main(String[] args), que lance AssertionError se falhar. Use javac/java JDK 21 sem dependências externas; NÃO use npm, package.json, node:test nem JUnit que dependa de downloads. Inclua todos os arquivos completos, sem truncamento.';
+ if(contract.language==='cobol')return 'CONTRATO OBRIGATÓRIO: COBOL/GnuCOBOL em formato livre. Na implementação, proponha arquivos .cob/.cbl completos e ao menos um teste COBOL executável, com status de saída diferente de zero em falha. Declare dados antes de PROCEDURE DIVISION; parágrafos PERFORM não recebem USING. Use MOVE em variáveis de trabalho e PERFORM simples para reutilizar asserções. Evite DISPLAY de sucesso para cada caso. Escolha nomes e interfaces a partir do pedido atual. Não imponha algoritmo, intervalo, aleatoriedade ou regra de negócio. Não use Node.js como wrapper. Sem wrappers de outra linguagem ou dependências externas.';
+ if(contract.language==='java')return 'CONTRATO OBRIGATÓRIO: JAVA JDK 21. NÃO use npm, package.json ou wrappers JavaScript. Gere arquivos .java e ao menos um *Test.java autocontido com public static void main(String[] args) e AssertionError em falha. Sem dependências externas. Nomes, interfaces e regras vêm somente do pedido atual.';
  if(contract.language==='go')return 'CONTRATO OBRIGATÓRIO: GO. Gere arquivos .go e pelo menos um *_test.go com package correto, import testing e TestXxx(t *testing.T). Testes via go test ./... sem rede; evite dependências externas. Nunca gere JavaScript ou npm.';
  if(contract.language==='python')return 'CONTRATO OBRIGATÓRIO: PYTHON. Gere arquivos .py e testes test_*.py com unittest padrão (sem pytest/dependências externas). Testes via python -m unittest discover. Nunca gere JavaScript ou npm.';
  if(contract.language==='rust')return 'CONTRATO OBRIGATÓRIO: RUST. Gere Cargo.toml, src/lib.rs e testes #[test] ou tests/*.rs. Testes via cargo test --offline; sem dependências externas. Nunca gere JavaScript ou npm.';

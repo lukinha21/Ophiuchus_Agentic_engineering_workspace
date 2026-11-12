@@ -1,3 +1,74 @@
+## Atualização 2.5.15 — estabilidade visual e sessão de trabalho
+
+- Artefatos têm área de leitura limitada com rolagem interna vertical; código e tabelas longos rolam horizontalmente dentro do painel. Contêineres flex/grid deixam de herdar largura mínima do conteúdo. Avatar circular com ícone de pessoa substitui o texto Você.
+- Progresso intermediário é estimativa visual baseada em tempo e arquivos locais, atualizado a cada 600 ms e limitado a menos de 100%. Conclusão depende do runtime; etapas reabertas deixam de aparecer concluídas só por constarem no histórico. Preferência de movimento reduzido continua disponível.
+- Envio limpa o texto aceito pelo backend e impede envios duplicados durante a requisição. Se o usuário digitar outro texto enquanto aguarda, ele é preservado. Erro no envio preserva o prompt.
+- Cancelar restaura console, prompt, tarefas, seleção, artefatos e explorador para novo trabalho; respostas e polls atrasados não restauram a execução anterior. Backend aceita cancelamento durante operação em andamento. O histórico é preservado no backend; provedores/bindings não são apagados. Requisição já enviada ao provedor pode terminar e consumir tokens, que ficam registrados sem avançar etapas ou aplicar arquivos.
+- Catálogo de modelos guarda somente IDs no sessionStorage da aba, sobrevivendo à navegação/reload/runs até fechar a sessão. Chaves e tokens não entram nesse cache. Mudança de credencial/endpoint invalida catálogo correspondente; controle de autenticação segue no backend. Catálogo pode ser consultado novamente manualmente.
+- Planejamento não recebe instruções de gerar código; blocos redundantes são omitidos do texto aceito sem nova chamada, mantendo resposta original para diagnóstico. Revisão exige evidence textual não vazia e recebe exemplo explícito; arrays não vazios de observações textuais são normalizados, arrays vazios continuam rejeitados.
+- Verificação: 131 testes de runtime (incluindo projeção gradual, sessão de catálogo, evidência e cancelamento tardio) e build TypeScript/Vite aprovados. Prévia visual automatizada não pôde ser aberta neste ambiente; aparência e comportamento no navegador precisam de conferência na instalação do usuário. Nenhuma chamada real a provedor/Docker nesta validação.
+- Instale com npm ci e reinicie API/frontend. Não é necessário apagar configurações ou histórico.
+
+## Atualização 2.5.14 — histórico completo acessível
+
+- Histórico mostra quantos documentos estão visíveis e o total. Botão Mostrar todos permite acessar os antigos, mantendo ordem dos mais recentes e conteúdo recolhível por documento.
+- A seleção de histórico completo permanece durante atualizações da execução; iniciar nova execução volta aos quatro recentes. Nenhuma alteração nos artefatos persistidos ou chamadas aos modelos.
+- Verificação: build TypeScript/Vite aprovado. Sem alteração no runtime.
+
+## Atualização 2.5.13 — QA estático sem chamada redundante
+
+- Docker indisponível + revisão estruturada favorável posterior à implementação e vinculada aos mesmos hashes: QA consolidado localmente, com zero tokens. Mantém STATIC_ONLY e informa que não houve segunda revisão independente.
+- Arquivos alterados, revisão inválida/desfavorável ou falha Docker real não entram nesse reaproveitamento. Testes reais continuam tendo prioridade.
+- Dashboard e contador do ciclo não contam artefatos locais ou reutilizados como chamadas pagas.
+- Validação: 126 testes de runtime e build aprovados. Sem provedor real ou Docker nesta validação. Na execução anterior do usuário, a etapa QA redundante tinha 2.663 tokens; essa é a etapa que a nova regra elimina em condição equivalente, não uma promessa de economia total da próxima run.
+- Atualize arquivos, execute npm ci, reinicie API/frontend e crie nova execução.
+
+## Atualização 2.5.12 — implementação incremental por arquivo
+
+- Fila de arquivos derivada dos caminhos entre crases na arquitetura da própria run, sem chamada extra ao modelo. Sem caminhos identificáveis, mantém o modo anterior de proposta completa. Não há algoritmo ou nome de negócio fixo.
+- Uma chamada por arquivo, preservando fontes aceitas por verificações locais na run (não significa compilação). Só grava o conjunto quando estiver completo e validado. Correções que citam caminhos conhecidos reabrem somente esses arquivos; sem caminho explícito, refaz o conjunto para evitar preservar dependentes incorretos.
+- Em modo por arquivo, resposta truncada é rejeitada com diagnóstico para uma versão compacta, sem concatenar rascunhos. Mesma falha duas vezes interrompe novas chamadas equivalentes; limites gerais continuam ativos.
+- Testes orientados a casos compactos e verificações reutilizáveis. Instruções COBOL explicam declaração de dados e PERFORM sem USING, sem impor primalidade, intervalos ou nomes.
+- UI mostra progresso por arquivo e artefatos parciais. Revisão desfavorável não pode ser reaproveitada por cache como aprovação.
+- Validação: 122 testes de runtime e build aprovados; sem Docker e sem chamadas reais a provedores. Economia real ainda não medida. Uma chamada por arquivo pode aumentar o número de chamadas em projetos que antes cabiam em uma resposta; o objetivo é reduzir repetição e truncamento em saídas maiores.
+- Atualize arquivos, execute npm ci, reinicie API/frontend e inicie nova execução. Runs antigas sem plano preservam o comportamento anterior.
+
+## Atualização 2.5.11 — respostas inválidas e matriz de linguagens
+
+- Revisão e QA preservam respostas inválidas como artefatos com uso de tokens, etapa, fontes e erro. Uma repetição orientada ocorre em um próximo passo do ciclo, respeitando seus limites de chamadas/tokens; segunda resposta inválida pausa com erro da etapa correta. Não há aprovação inferida de prosa.
+- Implementação deve emitir apenas blocos de arquivos. Relatórios externos alegando compilação/execução são rejeitados e enviados como feedback; a interface identifica o conteúdo do modelo como alegação, sem substituir a evidência do runtime.
+- Erro real encontrado na matriz: “em C#” podia ser classificado como C. Corrigido. Pré-verificação COBOL também rejeita PERFORM de parágrafo com USING.
+- Matriz de protocolo com respostas controladas: COBOL, JavaScript, Python, Java, Go, Rust e C#. Cobre transporte de arquivos, resposta inválida, repetição com diagnóstico, QA e entrega canônica estática. Não equivale a geração real nem compilação nessas sete linguagens.
+- 118 testes de runtime e build aprovados. Verificações funcionais adicionais locais: Python e JavaScript, 14 casos de primalidade em cada, com implementações de referência escritas para a verificação. Compiladores Java/Go/Rust/COBOL e Docker não disponíveis nesta validação; não foram instalados. Nenhuma chamada a provedores reais.
+- Atualize arquivos, execute npm ci, reinicie API/frontend e inicie nova execução.
+
+## Atualização 2.5.10 — qualidade e entrega canônica
+
+- Entrega local sem chamada ao modelo: lista os arquivos da implementação e hashes, sem reescrever código. Verifica vínculo do QA com a mesma versão das fontes.
+- Status visível distingue testes Docker aprovados de revisão somente estática. Docker não foi investigado nesta atualização.
+- Revisão exige JSON estruturado; falhas voltam ao responsável. Parecer favorável em prosa não avança. Cache de revisões anteriores ao novo esquema não é reaproveitado.
+- Verificações COBOL limitadas detectam DECLARE no formato inválido observado e referências WS-/LK-/TST- sem declaração no arquivo. Não são compilador nem prova de correção; a busca de identificadores é omitida em fontes com COPY/SQL, que podem fornecer declarações externas.
+- 109 testes de runtime e build aprovados. Sem chamadas reais a provedores ou execução Docker nesta validação. Revisão estática por IA permanece sujeita a falhas.
+- Atualize arquivos, execute npm ci, reinicie API/frontend e crie nova execução.
+
+## Atualização 2.5.9 — feedback de rejeição e correções
+
+- O desenvolvedor recebe um exemplo literal de delimitadores Markdown, com placeholders de caminho/conteúdo e linguagem da execução, sem regras de negócio fixas.
+- A tentativa seguinte recebe o motivo da última rejeição destinada à etapa atual, com orientação para preservar os critérios de aceite e a lógica funcional.
+- O ciclo automático respeita a rejeição já contabilizada pelo executor, não reaplica propostas antigas e não conta duas correções para a mesma resposta. Execuções bloqueadas retornam sem nova validação.
+- Verificação: 104 testes de runtime aprovados e build de produção aprovado. Regressões cobrem resposta sem delimitadores, recuperação com feedback, ausência de gravação inválida e bloqueio após três chamadas rejeitadas. Provedor real e Docker não executados nesta verificação.
+- Instalação: atualize os arquivos do projeto, execute npm ci e reinicie API/frontend. Faça uma nova execução para validar o fluxo completo; execuções já bloqueadas não são reabertas por esta atualização.
+
+## Atualização 2.5.8 — contratos e continuidade
+
+- Contratos COBOL/Java sem nomes, algoritmos, aleatoriedade ou limites de tarefas anteriores. Regras de negócio vêm somente do pedido da run atual.
+- Nova run inicia sem artefatos, rascunhos ou contrato da anterior; configurações de modelos continuam independentes do histórico de tarefas.
+- Planejamento e revisão orientados a respostas concisas, sem reescrever implementação. Contexto por etapa inclui apenas decisões relevantes e a versão mais recente de cada etapa.
+- Implementação rejeita blocos reiniciados, delimitadores inválidos, caminhos duplicados e blocos abertos antes de propor arquivos. A correção volta ao desenvolvedor, sujeita aos limites existentes. Não há reparo silencioso nem garantia de sintaxe baseada em Markdown.
+- A interface distingue artefatos rejeitados por integridade. Finalização do modelo não comprova compilação.
+- Validação: 101 testes de runtime, incluindo isolamento entre pedidos e continuação malformada. Sem chamadas pagas ou execução Docker nesta verificação.
+- Uso: instale dependências com npm ci; inicie API e frontend como anteriormente. Para testar pedidos independentes, crie uma nova execução. Uma execução existente mantém seu pedido e artefatos para permitir correções.
+
 # Ophiuchus Pilot 2.5.4
 
 Correção do contrato imutável de linguagem desde a criação da run. O contrato é persistido, enviado nas mensagens system e user de cada agente, registrado por etapa e validado antes da progressão em Discovery, Specification e Architecture. Rejeições de planejamento não consomem tentativas de correção de código e interrompem a execução assistida para diagnóstico.

@@ -6,7 +6,7 @@ export function summarizeMetrics(runs,days=7,now=Date.now()){
  let input=0,output=0,unknown=0,calls=0;
  for(const run of selected){let runTokens=0,runCalls=0;
   for(const a of [...(run.artifacts||[]),...(run.pendingDraft?[run.pendingDraft]:[])]){
-   if(a.providerId==='mock')continue;
+   if(['mock','local'].includes(a.providerId)||a.reusedFrom)continue;
    const key=`${a.providerId||'unknown'} / ${a.model||'unknown'}`;
    const row=byModel.get(key)||{key,provider:a.providerId||'unknown',model:a.model||'unknown',input:0,output:0,calls:0,unknown:0,stages:{}};
    const i=Number(a.usage?.prompt_tokens)||0,o=Number(a.usage?.completion_tokens)||0,t=Number(a.usage?.total_tokens)||i+o;

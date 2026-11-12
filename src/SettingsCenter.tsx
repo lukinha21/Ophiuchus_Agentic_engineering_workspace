@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import {readModelCatalog,saveModelCatalog} from './modelCatalog'
 import { api } from './runtimeClient'
 import { ArrowLeft, Check, ChevronDown, CircleHelp, ExternalLink, KeyRound, Link2, LockKeyhole, PlugZap, Search, ShieldCheck, SlidersHorizontal, Sparkles } from 'lucide-react'
 import type { AgentDefinition } from './domain'
@@ -33,7 +34,8 @@ export default function SettingsCenter({agents, onUpdate, onBack}:{agents:AgentD
   const [showSecret,setShowSecret]=useState(false)
   const [secret,setSecret]=useState('')
   const [serverProviders,setServerProviders]=useState<Array<{id:string;name:string;configured:boolean;kind:string}>>([])
-  const [serverModels,setServerModels]=useState<Record<string,string[]>>({})
+  const [serverModels,setServerModels]=useState<Record<string,string[]>>(readModelCatalog)
+  useEffect(()=>saveModelCatalog(serverModels),[serverModels])
   const [busy,setBusy]=useState(false)
   const [feedback,setFeedback]=useState('')
   const [options,setOptions]=useState({mode:'off',maxOutputTokens:1400,historyArtifacts:7,artifactChars:6500,keepRecent:2,autonomy:'supervised',maxContinuations:2})
@@ -45,9 +47,9 @@ export default function SettingsCenter({agents, onUpdate, onBack}:{agents:AgentD
   useEffect(()=>{void refreshProviders().catch(()=>{})},[])
   const unlock=async()=>{setBusy(true);setFeedback('');try{await api('/vault/unlock',{password:vaultPassword});setVaultPassword('');await refreshProviders();setFeedback('Cofre desbloqueado. Você pode salvar suas chaves.')}catch(e){setFeedback((e as Error).message)}finally{setBusy(false)}}
   const lock=async()=>{setBusy(true);try{await api('/vault/lock',{});setSecret('');await refreshProviders();setFeedback('Cofre bloqueado.')}catch(e){setFeedback((e as Error).message)}finally{setBusy(false)}}
-  const saveEndpoint=async()=>{setBusy(true);try{await api('/vault/custom-endpoint',{baseUrl:customEndpoint},'PUT');await refreshProviders();setFeedback('Endpoint HTTPS autorizado e salvo no cofre.')}catch(e){setFeedback((e as Error).message)}finally{setBusy(false)}}
-  const saveKey=async()=>{setBusy(true);setFeedback('');try{await api(`/vault/credentials/${selected}`,{key:secret},'PUT');setSecret('');await refreshProviders();setFeedback('Chave salva no cofre criptografado.')}catch(e){setFeedback((e as Error).message)}finally{setBusy(false)}}
-  const deleteKey=async()=>{if(!window.confirm('Remover a chave salva deste provedor?'))return;setBusy(true);try{await api(`/vault/credentials/${selected}`,{},'DELETE');await refreshProviders();setFeedback('Chave removida do cofre.')}catch(e){setFeedback((e as Error).message)}finally{setBusy(false)}}
+  const saveEndpoint=async()=>{setBusy(true);try{await api('/vault/custom-endpoint',{baseUrl:customEndpoint},'PUT');setServerModels(p=>{const next={...p};delete next.custom;return next});await refreshProviders();setFeedback('Endpoint HTTPS autorizado e salvo no cofre.')}catch(e){setFeedback((e as Error).message)}finally{setBusy(false)}}
+  const saveKey=async()=>{setBusy(true);setFeedback('');try{await api(`/vault/credentials/${selected}`,{key:secret},'PUT');setSecret('');setServerModels(p=>{const next={...p};delete next[selected];return next});await refreshProviders();setFeedback('Chave salva no cofre criptografado.')}catch(e){setFeedback((e as Error).message)}finally{setBusy(false)}}
+  const deleteKey=async()=>{if(!window.confirm('Remover a chave salva deste provedor?'))return;setBusy(true);try{await api(`/vault/credentials/${selected}`,{},'DELETE');setServerModels(p=>{const next={...p};delete next[selected];return next});await refreshProviders();setFeedback('Chave removida do cofre.')}catch(e){setFeedback((e as Error).message)}finally{setBusy(false)}}
   const discover=async(id:string)=>{setBusy(true);setFeedback('');try{const models=await api<Array<{id:string}>>(`/providers/${id}/models`);setServerModels(p=>({...p,[id]:models.map(m=>m.id)}));setFeedback(`${models.length} modelos encontrados em ${id}.`)}catch(e){setFeedback((e as Error).message)}finally{setBusy(false)}}
   const beginGoogleOAuth=async()=>{
    if(!vault.unlocked){setFeedback('Desbloqueie o cofre antes de conectar Google.');return}
