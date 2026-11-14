@@ -1,7 +1,11 @@
 {
   "name": "ophiuchus-pilot",
   "private": true,
+<<<<<<< HEAD
   "version": "2.6.2",
+=======
+  "version": "2.5.15",
+>>>>>>> 31a282fb43e7810ce5e577698cdb29bbe2af6469
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
