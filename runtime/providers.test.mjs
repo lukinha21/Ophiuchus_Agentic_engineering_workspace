@@ -4,3 +4,8 @@ test('catalog reports configuration without leaking keys',()=>{const result=list
 test('models are discovered using a mocked provider',async()=>{const models=await listModels('openai',{env:{OPENAI_API_KEY:'test'},fetchImpl:async(url,options)=>{assert.match(url,/\/models$/);assert.equal(options.headers.Authorization,'Bearer test');return {ok:true,json:async()=>({data:[{id:'model-b'},{id:'model-a'}]})};}});assert.deepEqual(models.map(m=>m.id),['model-a','model-b']);});
 test('adapter returns usage and text',async()=>{const result=await generateText({providerId:'openai',model:'demo',messages:[{role:'user',content:'oi'}]},{env:{OPENAI_API_KEY:'test'},fetchImpl:async()=>({ok:true,json:async()=>({choices:[{message:{content:'Olá'}}],usage:{total_tokens:9}})})});assert.equal(result.text,'Olá');assert.equal(result.usage.total_tokens,9);});
 test('no credential means no external request',async()=>{await assert.rejects(()=>listModels('openai',{env:{},fetchImpl:()=>{throw Error('Should not call');}}),/não configurado/);});
+
+test('empty truncated responses retain finish reason and usage for bounded recovery',async()=>{
+ const result=await generateText({providerId:'openai',model:'demo',allowEmptyTruncated:true,messages:[{role:'user',content:'oi'}]},{env:{OPENAI_API_KEY:'test'},fetchImpl:async()=>({ok:true,json:async()=>({choices:[{message:{content:''},finish_reason:'length'}],usage:{total_tokens:4096}})})});
+ assert.equal(result.text,'');assert.equal(result.finishReason,'length');assert.equal(result.usage.total_tokens,4096);
+});

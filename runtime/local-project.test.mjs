@@ -6,10 +6,10 @@ import {tmpdir} from 'node:os';
 import {createProjectService,projectPath} from './local-project.mjs';
 const binding={providerId:'google',modelId:'fixture'};
 const proposal=changes=>({text:JSON.stringify({summary:'Correção revisável',changes}),finishReason:'stop',usage:{prompt_tokens:10,completion_tokens:20,total_tokens:30}});
-async function fixture(t,generate=async()=>proposal([{path:'src/sum.mjs',content:'export const sum=(a,b)=>a+b;\n',reason:'Somar corretamente'}]),docker){
+async function fixture(t,generate=async()=>proposal([{path:'src/sum.mjs',content:'export const sum=(a,b)=>a+b;\n',reason:'Somar corretamente'}]),docker,onUsage){
  const dir=await mkdtemp(join(tmpdir(),'ophi-project-')),root=join(dir,'project');await mkdir(join(root,'src'),{recursive:true});await mkdir(join(root,'tests'));
  await writeFile(join(root,'src/sum.mjs'),'export const sum=(a,b)=>a-b;\n');await writeFile(join(root,'tests/sum.test.mjs'),"import {sum} from '../src/sum.mjs';\n");await writeFile(join(root,'package.json'),'{"type":"module"}');
- const service=createProjectService({storageRoot:join(dir,'store'),generate,docker});const project=await service.open({path:root,confirmRead:true});t.after(()=>rm(dir,{recursive:true,force:true}));return {dir,root,service,project};
+ const service=createProjectService({storageRoot:join(dir,'store'),generate,docker,onUsage});const project=await service.open({path:root,confirmRead:true});t.after(()=>rm(dir,{recursive:true,force:true}));return {dir,root,service,project};
 }
 const task=(f,extra={})=>f.service.task(f.project.id,{goal:'Corrija sum',mode:'propose',paths:['src/sum.mjs'],binding,confirmSend:true,...extra});
 test('path policy rejects traversal, absolute paths, symlinks destinations and secret conventions',()=>{
@@ -110,4 +110,36 @@ test('follow-up includes bounded conversation while a fresh chat carries no prev
  await assert.rejects(task(f,{history:[{role:'user',content:'x'.repeat(1801)}]}),/Histórico/);
  await assert.rejects(task(f,{history:Array(7).fill({role:'user',content:'x'})}),/Histórico/);
  assert.equal(captured.length,2);
+});
+
+test('truncation recovers once with a smaller scope, accounts both calls and discards partial code',async t=>{
+ const calls=[];const reports=[];
+ const f=await fixture(t,async(args,options)=>{calls.push(args);assert.ok(options.signal);return calls.length===1?{text:'{"summary":"partial","changes":[',finishReason:'length',usage:{prompt_tokens:10,completion_tokens:20,total_tokens:30}}:proposal([{path:'src/sum.mjs',edits:[{oldText:'a-b',newText:'a+b'}]}]);},undefined,async report=>reports.push(report));
+ const r=await task(f,{paths:['src/sum.mjs','package.json']});assert.equal(calls.length,2);assert.equal(reports.length,2);assert.notEqual(reports[0].id,reports[1].id);assert.equal(reports.reduce((n,r)=>n+r.usage.total_tokens,0),60);assert.equal(calls[0].maxOutputTokens,4096);assert.equal(calls[1].maxOutputTokens,4096);
+ assert.match(calls[1].messages[1].content,/RECUPERAÇÃO LIMITADA/);assert.doesNotMatch(calls[1].messages[1].content,/"type":"module"/);
+ assert.match(r.draft.summary,/Escopo reduzido/);assert.equal(r.draft.usage.total_tokens,60);assert.equal(r.draft.changes[0].content,'export const sum=(a,b)=>a+b;\n');
+ assert.match(await readFile(join(f.root,'src/sum.mjs'),'utf8'),/a-b/);
+ const dir=join(f.dir,'store',f.project.id,'drafts',r.draft.id);assert.equal(JSON.parse(await readFile(join(dir,'response.json'),'utf8')).finishReason,'length');assert.equal(JSON.parse(await readFile(join(dir,'response-retry.json'),'utf8')).finishReason,'stop');
+});
+
+test('repeated truncation stops after two attempts without a draft',async t=>{
+ let calls=0;const f=await fixture(t,async()=>{calls++;return {text:'',finishReason:'length',usage:{total_tokens:12}}});
+ await assert.rejects(task(f),/Resposta truncada/);assert.equal(calls,2);assert.equal((await f.service.info(f.project.id)).drafts.length,0);assert.match(await readFile(join(f.root,'src/sum.mjs'),'utf8'),/a-b/);
+});
+
+test('recovery rejects full files and changes outside its reduced scope',async t=>{
+ for(const change of [{path:'src/sum.mjs',content:'replacement'},{path:'package.json',edits:[{oldText:'module',newText:'commonjs'}]}]){
+  let calls=0;const f=await fixture(t,async()=>++calls===1?{text:'partial',finishReason:'length'}:proposal([change]));
+  await assert.rejects(task(f,{paths:['src/sum.mjs','package.json']}),/escopo reduzido/);assert.equal(calls,2);assert.equal((await f.service.info(f.project.id)).drafts.length,0);
+ }
+});
+
+test('analysis truncation and provider errors do not trigger automatic retries',async t=>{
+ let calls=0;const f=await fixture(t,async()=>{calls++;return {text:'partial',finishReason:'length'}});await assert.rejects(task(f,{mode:'analyse'}),/truncada/);assert.equal(calls,1);
+ const g=await fixture(t,async()=>{calls++;throw Error('HTTP 429')});await assert.rejects(task(g),/429/);assert.equal(calls,2);
+});
+
+test('cancellation during first attempt prevents recovery',async t=>{
+ const controller=new AbortController();let calls=0;const f=await fixture(t,async()=>{calls++;controller.abort();return {text:'partial',finishReason:'length'}});
+ await assert.rejects(f.service.task(f.project.id,{goal:'melhore',mode:'propose',paths:['src/sum.mjs'],binding,confirmSend:true},{signal:controller.signal}),/abort/i);assert.equal(calls,1);
 });

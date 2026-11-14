@@ -34,7 +34,7 @@ export async function listModels(id,{env=process.env,fetchImpl=fetch,signal}={})
  return models.filter(m=>typeof m.name==='string'||typeof m.id==='string').filter(m=>p.kind!=='gemini'||m.supportedGenerationMethods?.includes('generateContent')).map(m=>({id:p.kind==='gemini'?m.name.replace(/^models\//,''):m.id,providerId:id,label:m.displayName||m.name||m.id})).sort((a,b)=>a.id.localeCompare(b.id));
 }
 function normalizeMessages(messages){return messages.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:String(m.content)}]}));}
-export async function generateText({providerId,model,messages,maxOutputTokens=600},{env=process.env,fetchImpl=fetch,signal}={}){
+export async function generateText({providerId,model,messages,maxOutputTokens=600,allowEmptyTruncated=false},{env=process.env,fetchImpl=fetch,signal}={}){
  const p=resolveProvider(providerId,env);if(!p.configured)throw Error('Provedor não configurado no servidor');
  if(typeof model!=='string'||!model.trim()||!Array.isArray(messages)||!messages.length)throw Error('Modelo e mensagens obrigatórios');
  if(!Number.isInteger(maxOutputTokens)||maxOutputTokens<1||maxOutputTokens>4096)throw Error('Limite de saída inválido');
@@ -63,6 +63,6 @@ export async function generateText({providerId,model,messages,maxOutputTokens=60
   text=typeof content==='string'?content:Array.isArray(content)?content.filter(x=>x?.type==='text').map(x=>x.text||'').join('\n'):'';
   finishReason=choice?.finish_reason??null;usage=json.usage??null;
  }
- if(!text.trim())throw Error(`O modelo retornou texto vazio (finish_reason: ${finishReason||'não informado'}). Experimente outro modelo ou aumente o limite de saída.`);
+ if(!text.trim()&&!(allowEmptyTruncated&&finishReason==='length'))throw Error(`O modelo retornou texto vazio (finish_reason: ${finishReason||'não informado'}). Experimente outro modelo ou aumente o limite de saída.`);
  return {providerId,model,text,usage,finishReason};
 }

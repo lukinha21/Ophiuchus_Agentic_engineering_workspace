@@ -1,4 +1,11 @@
-<<<<<<< HEAD
+## Atualização 2.7.0 — equipe no projeto e Ophiuchus Studio
+
+Projetos locais agora oferecem uma equipe de seis agentes em sequência, com plano, arquitetura, proposta isolada, revisão independente, QA estático e documentação. O registro no chat acompanha estados reais, permite inspecionar os artefatos e cancelar; gravação e testes permanecem separados. Até 7 chamadas autorizadas por fluxo, sem repetição ilimitada. Reprovações e respostas inválidas bloqueiam a aplicação.
+
+A interface passa a usar superfícies de papel, navegação em grafite, tipografia editorial e marcadores discretos. A tela inicial, o explorador, o composer e o acompanhamento têm uma linguagem visual comum. A prévia offline usa os componentes reais e cenários simulados: `npm run preview:studio`.
+
+Detalhes, limites, validação estática e instruções: [LOCAL_PROJECT.md](LOCAL_PROJECT.md). A integração paga dos seis agentes não foi executada nesta alteração; as verificações usam respostas controladas e prévia simulada.
+
 ## Atualização 2.6.2 — conversa contínua no projeto
 
 O console do projeto mantém mensagens em sequência e reutiliza até seis mensagens recentes (até 1.800 caracteres cada) como contexto. “Novo chat” limpa a conversa, o campo de texto e as permissões de escrita/testes; mantém a pasta aberta e não desfaz arquivos já aplicados. O histórico da conversa fica em memória enquanto a aplicação está aberta.
@@ -31,8 +38,6 @@ Guia completo: [LOCAL_PROJECT.md](LOCAL_PROJECT.md). Primeiro teste: abra [examp
 
 Atualize arquivos, execute npm ci e reinicie API/frontend. Não apague seu diretório .ophiuchus-local ao atualizar.
 
-=======
->>>>>>> 31a282fb43e7810ce5e577698cdb29bbe2af6469
 ## Atualização 2.5.15 — estabilidade visual e sessão de trabalho
 
 - Artefatos têm área de leitura limitada com rolagem interna vertical; código e tabelas longos rolam horizontalmente dentro do painel. Contêineres flex/grid deixam de herdar largura mínima do conteúdo. Avatar circular com ícone de pessoa substitui o texto Você.

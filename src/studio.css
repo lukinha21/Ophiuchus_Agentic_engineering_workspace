@@ -1,0 +1,197 @@
+/* Ophiuchus Studio: paper, ink and a single botanical accent. */
+:root{--studio-paper:#f6f5f0;--studio-surface:#fffefa;--studio-ink:#26342f;--studio-muted:#727a72;--studio-rule:#dddeda;--studio-green:#315c4b;--studio-soft:#e9eee7;--studio-alert:#a05035}
+.ophi-studio{color:var(--studio-ink);background:var(--studio-paper);font-family:'Segoe UI',Arial,sans-serif;font-size:13px}
+.ophi-studio *{scrollbar-color:#b7bdb5 transparent}
+.ophi-studio *::-webkit-scrollbar-thumb{background:#bac1b7;border-color:transparent;border-radius:4px}
+.ophi-studio *::-webkit-scrollbar-track{background:transparent}
+.ophi-studio button{color:inherit;box-shadow:none}
+.ophi-studio button:focus-visible,.ophi-studio input:focus-visible,.ophi-studio textarea:focus-visible,.ophi-studio summary:focus-visible{outline:2px solid #547b61;outline-offset:3px}
+.ophi-studio .v5-dock{background:#1e2a25;border:0;width:58px;min-width:58px;padding:20px 7px;gap:12px}
+.ophi-studio .v5-logo{background:none;border:0;box-shadow:none;overflow:visible;width:42px;height:42px;padding:0;color:#e6ece3;font:italic 26px Georgia,serif;display:grid;place-items:center;margin-bottom:29px}
+.ophi-studio .v5-dock>button{background:transparent;color:#9daea1;border:0;border-radius:5px;width:40px;height:40px;box-shadow:none}
+.ophi-studio .v5-dock>button:hover{background:#2b3d32;color:#fff}
+.ophi-studio .v5-dock>button.active{background:#d5e2d1;color:#24392b;box-shadow:none}
+.ophi-studio .v5-body{background:var(--studio-paper)}
+.ophi-studio .v5-topbar{height:76px;min-height:76px;border-bottom:1px solid var(--studio-rule);background:var(--studio-paper);padding:0 30px;gap:30px}
+.ophi-studio .v5-wordmark{min-width:160px;flex:0 0 190px}
+.ophi-studio .v5-wordmark strong{font-size:23px;letter-spacing:-1.2px;font-weight:650;color:#283c30;text-transform:none}
+.ophi-studio .v5-wordmark strong span{font-size:9px;vertical-align:top;margin-left:3px;letter-spacing:0}
+.ophi-studio .v5-wordmark small{font:8px/1.8 ui-monospace,monospace;letter-spacing:.17em;color:#7c847a;margin-top:5px}
+.ophi-studio .v5-tabs{padding:0;background:none;border:0;border-radius:0;gap:24px;height:76px;flex-shrink:0}
+.ophi-studio .v5-tabs button{color:#737b71;background:transparent;border:0;border-radius:0;padding:0 2px;gap:8px;font-size:12px;box-shadow:none;border-bottom:2px solid transparent}
+.ophi-studio .v5-tabs button.active{color:#243e2d;background:none;border-color:#45694e;box-shadow:none}
+.ophi-studio .v5-live{color:#7b8278;font-size:10px;gap:7px}
+.ophi-studio .v5-led{background:#63806a;box-shadow:none;width:6px;height:6px}
+.ophi-studio .v5-top-actions{gap:7px;margin-left:auto}
+.ophi-studio .v5-top-actions button{color:#687366;border-color:var(--studio-rule);background:transparent;border-radius:5px;font-size:10px;padding:8px}
+.ophi-studio .v5-workspace{background:var(--studio-paper)}
+.ophi-studio .v5-project-sidebar{background:#eeefe8;border-color:var(--studio-rule)}
+.ophi-studio .v6-resizer{background:transparent;border:0}.ophi-studio .v6-resizer:hover{background:#93a48a}
+.ophi-studio .v5-center{background:var(--studio-paper);padding:32px clamp(22px,4vw,64px) 24px;gap:22px;overflow-y:auto;min-width:0}
+.ophi-studio .v5-console-head{width:100%;max-width:1050px;margin:0 auto;border-bottom:1px solid var(--studio-rule);padding-bottom:22px;align-items:flex-start}
+.ophi-studio .v5-kicker{color:#798274;font:9px/1.5 ui-monospace,monospace;letter-spacing:.12em}
+.ophi-studio .v5-kicker>svg{display:none}
+.ophi-studio .v5-console-heading h1{font-family:Georgia,'Times New Roman',serif;font-weight:400;font-size:30px;letter-spacing:-.8px;color:#283c30;margin:10px 0}
+.ophi-studio .v5-console-heading p{color:#83897f;font-size:11px;line-height:1.6}
+.ophi-studio .v5-demo-pill{color:#7d8578;border:1px solid var(--studio-rule);border-radius:3px;background:transparent;font:8px ui-monospace,monospace;padding:6px}
+.ophi-studio .v5-console-tools .v5-tip{display:none}
+.ophi-studio .v5-inspector-open{background:var(--studio-paper);border-color:var(--studio-rule);color:#788571;border-radius:5px;top:30px}
+.ophi-studio .v5-composer{background:var(--studio-surface);border:1px solid #cdd4c7;border-radius:9px;box-shadow:0 4px 16px #283c3007;width:100%;max-width:1050px;margin:24px auto 0;padding:16px 19px;flex-shrink:0}
+.ophi-studio .v5-composer:focus-within{border-color:#6f8c71;box-shadow:0 0 0 2px #547b6110}
+.ophi-studio .v5-composer textarea{color:#263c2c;background:transparent;font-size:13px;min-height:56px;max-height:170px}
+.ophi-studio .v5-composer textarea::placeholder{color:#92988b}
+.ophi-studio .v5-composer-bottom>div{color:#969b8e;font-size:10px}
+.ophi-studio .v5-composer-bottom>div button{color:#808b78}
+.ophi-studio .v5-send{background:#315c4b!important;color:#f4f7ee!important;border-radius:6px;box-shadow:none;width:34px;height:34px}
+.ophi-studio .v5-send:disabled{background:#d6dcd0!important;color:#8c9887!important;opacity:1}
+.ophi-studio .local-project{color:var(--studio-ink)}
+.ophi-studio .local-project p{color:#75806f}.ophi-studio .local-project small{color:#818a7c}
+.ophi-studio .local-project button{background:var(--studio-surface);color:#3a5541;border:1px solid #d6dcd0;border-radius:5px;font-size:11px;padding:8px 11px}
+.ophi-studio .local-project button:hover{background:#e7ede2}.ophi-studio .local-project button:disabled{opacity:.45}
+.ophi-studio .local-project input:not([type=checkbox]),.ophi-studio .local-project textarea,.ophi-studio .local-project select{background:#f9faf5;border-color:#d3d9cd;color:#344832;border-radius:5px}
+.ophi-studio .local-project label{color:#68775e}.ophi-studio input[type=checkbox]{accent-color:#3d6650}
+.ophi-studio .local-project code{color:#5c6c53}
+.ophi-studio .project-rail-heading{color:#798473;font:9px ui-monospace,monospace;letter-spacing:.1em;padding:23px 20px;border-color:var(--studio-rule);min-height:67px}
+.ophi-studio .project-rail-heading button{padding:3px;border:0;background:none}
+.ophi-studio .project-rail-empty{justify-content:flex-start;padding:60px 23px 24px;gap:18px}
+.ophi-studio .rail-index{font:8px ui-monospace,monospace;letter-spacing:.1em;color:#8c9784}
+.ophi-studio .project-rail-empty h2{font:normal 25px/1.18 Georgia,serif;letter-spacing:-.5px;color:#43583b;margin:0}
+.ophi-studio .project-rail-empty p{font-size:11px;line-height:1.8;margin:0}
+.ophi-studio .project-rail .project-open-native{border-color:#aebca5;background:transparent;box-shadow:none;justify-content:flex-start;padding:12px;color:#38532f}
+.ophi-studio .project-root-name{color:#3d5335;padding:22px 18px 16px}
+.ophi-studio .project-root-name strong{font-size:12px}
+.ophi-studio .project-rail-search{margin:0 16px 15px}.ophi-studio .project-rail-search input{background:#f6f7f0!important;border-color:#d4dbcd!important}
+.ophi-studio .project-rail-files{padding:0 17px 15px}
+.ophi-studio .project-tree-level details>summary{color:#607151;font-size:11px;padding:6px 0;cursor:pointer}.ophi-studio .project-tree-level .project-tree-level{border-color:#d5ddce}
+.ophi-studio .project-file{padding:6px 0}.ophi-studio .project-file button{background:transparent;border:0;padding:3px}.ophi-studio .project-file label span{font-size:11px}
+.ophi-studio .project-rail-footer{border-color:#d4dccd;color:#819276;padding:16px 18px}
+.ophi-studio .project-context-bar{border:0;border-bottom:1px solid var(--studio-rule);background:transparent;border-radius:0;padding:0 0 15px;margin:0 0 18px;color:#3b5032;font-size:12px}
+.ophi-studio .project-context-bar span{color:#8d9685;font-size:10px}.ophi-studio .project-context-bar button{border:0;background:none;font-size:10px;padding:4px}
+.ophi-studio .project-console-permission{background:#eff1e9;border:1px solid #dfe4d6;border-radius:6px;padding:14px 17px}
+.ophi-studio .project-console-permission summary{color:#5b6d4d;font-size:11px}
+.ophi-studio .project-console-permission .project-check{font-size:11px;color:#728065;margin:12px 0 0}
+.ophi-studio .project-task-modes .selected{background:#315c4b;color:#fff;border-color:#315c4b}
+.ophi-studio .project-chat-thread{gap:22px;padding:20px 0}
+.ophi-studio .project-chat-empty{text-align:left;padding:38px 0 46px;max-width:600px}
+.ophi-studio .project-chat-empty>svg{display:none}.ophi-studio .project-chat-empty h2{font:28px Georgia,serif;color:#354f38;letter-spacing:-.5px}
+.ophi-studio .project-chat-empty p{line-height:1.9;max-width:460px;font-size:13px}
+.ophi-studio .project-message{background:transparent;border:0;border-radius:0;padding:2px 0 12px;color:#344b33;max-width:calc(100% - 40px);font-size:13px}
+.ophi-studio .project-chat-thread .user .project-message{background:#e6ecdf;border:1px solid #dce4d4;border-radius:7px;padding:13px 17px;max-width:min(85%,760px);color:#40523a}
+.ophi-studio .v5-chat-avatar{border-radius:4px;width:28px;height:28px;background:#e1e8d9;border:0;color:#47643a;box-shadow:none}
+.ophi-studio .v5-chat-avatar svg{width:16px;height:16px;fill:none}
+.ophi-studio .v5-chat-avatar.user{background:#e9e9df;color:#79846b;border:0}
+.ophi-studio .v5-chat-by{font:8px ui-monospace,monospace;letter-spacing:.1em;color:#829074;text-transform:uppercase;margin-bottom:8px}
+.ophi-studio .project-message-error{color:#a35b3a;border-left:2px solid #c19a7d;padding-left:12px}
+.ophi-studio .local-project .artifact-markdown,.ophi-studio .local-project .artifact-markdown p{color:#596852;font-size:12px;line-height:1.9}
+.ophi-studio .artifact-markdown :is(h1,h2,h3,h4){color:#344b33}
+.ophi-studio .local-project pre{background:#eef1e8;color:#4c6241;border-color:#d9e0cf;font-size:11px}
+.ophi-studio .project-preview,.ophi-studio .project-change{border-color:#d6dfcb;border-radius:5px}
+.ophi-studio .project-preview header{background:#e9eedf;color:#4a6240}
+.ophi-studio .project-draft{border:1px solid #d7e0ce;border-radius:7px;background:#fafcf5;margin-top:22px;padding:22px!important}
+.ophi-studio .project-draft h2{font:23px Georgia,serif;letter-spacing:-.4px;color:#334d35}
+.ophi-studio .project-change summary{background:#f1f5e9;padding:12px 15px}.ophi-studio .project-change summary span{color:#829875}
+.ophi-studio .project-diff .diff-add{background:#dfebd8;color:#386c33}.ophi-studio .project-diff .diff-remove{background:#f4e8df;color:#9c6645}
+.ophi-studio .project-tests{border-color:#d6e0ca}.ophi-studio .project-test-pass{background:#eaf2df;color:#496c37;border-color:#b8cf9c}
+.ophi-studio .project-error,.ophi-studio .project-toast{color:#95593f;background:#fbf2e8;border-color:#d0af92;box-shadow:0 8px 30px #45312316}
+.ophi-studio .project-toast p{color:#866d57}.ophi-studio .project-toast>svg{color:#aa7350}.ophi-studio .project-toast button{color:#967458}
+.ophi-studio .project-working{background:#eef3e6;border:1px solid #cdddc0;border-radius:5px;color:#62804a}.ophi-studio .project-working span{color:#7f906d}
+.ophi-studio .project-context,.ophi-studio .project-tests{border-color:#d9e2ce}.ophi-studio .project-context{border-radius:5px;color:#849773}
+.ophi-studio .project-flow-history{font-size:10px;color:#85947a;border-bottom:1px solid #dce5d2;padding:0 0 14px}.ophi-studio .project-flow-history summary{cursor:pointer;padding:7px 0;overflow-wrap:anywhere}
+.flow-ledger{border:1px solid #cbd6c2;border-radius:8px;background:#fbfcf6;overflow:hidden;min-width:0;width:100%;margin:0 0 10px;color:#3d5235}
+.flow-ledger-head{padding:21px 23px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #e1e8d9}
+.flow-title{display:flex;gap:13px;align-items:center;min-width:0}.flow-sign{font:italic 23px Georgia,serif;color:#4c6d3c;border:1px solid #d8e2ce;border-radius:4px;display:grid;place-items:center;width:38px;height:38px;flex-shrink:0}
+.flow-eyebrow{font:8px ui-monospace,monospace;letter-spacing:.12em;color:#93a185}.flow-ledger h3{font-size:14px;font-weight:550;margin:5px 0 0;line-height:1.4}
+.flow-head-meta{display:flex;gap:13px;align-items:center}.flow-head-meta>span{font:12px ui-monospace,monospace;color:#7e916c;white-space:nowrap}.flow-head-meta button{font-size:9px!important;background:transparent!important;padding:6px 9px!important}
+.flow-stations{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));list-style:none;padding:24px 22px 22px;margin:0;gap:0}
+.flow-stations li{position:relative;min-width:0}.flow-stations li:not(:last-child)::after{content:'';position:absolute;height:1px;background:#dbe4d2;left:29px;right:2px;top:12px}
+.flow-stations button{display:flex!important;flex-direction:column;align-items:flex-start!important;justify-content:flex-start!important;border:0!important;border-radius:0!important;padding:0 5px 0 0!important;background:transparent!important;text-align:left;gap:0!important;width:100%;min-width:0}
+.station-marker{width:25px;height:25px;border-radius:50%;border:1px solid #d3dfc9;background:#fbfcf6;display:grid;place-items:center;font:8px ui-monospace,monospace;position:relative;z-index:1;color:#9aa98c}
+.flow-stations strong{font-size:10px;font-weight:550;margin-top:12px;color:#80936c;line-height:1.5;overflow-wrap:anywhere}.flow-stations small{font-size:8px!important;color:#a2af96!important;margin-top:3px;line-height:1.4}
+.station-completed .station-marker{background:#e0ecd5;border-color:#c6d8b6;color:#547a3b}.station-completed::after{background:#bbd1a7!important}
+.station-running .station-marker{border-color:#4f7541;background:#315c4b;color:#fff}.station-running strong,.flow-stations [aria-current=step] strong{color:#3a6032}
+.station-blocked .station-marker,.station-failed .station-marker{border-color:#c3956c;color:#a66b3d;background:#fff4e8}
+.station-live{width:5px;height:5px;background:#dcebcf;border-radius:50%;animation:studio-breathe 1.6s ease-in-out infinite}
+.flow-current{background:#edf3e5;border-top:1px solid #e1e8d9;display:flex;align-items:center;gap:11px;padding:14px 23px;min-width:0}
+.flow-state-dot{width:6px;height:6px;flex-shrink:0;border-radius:50%;background:#b5c3a8}.flow-state-dot.state-running{background:#5c8544}.flow-state-dot.state-failed,.flow-state-dot.state-blocked{background:#b17a46}
+.flow-current>div{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}.flow-current strong{font-size:11px;font-weight:550}.flow-current span{font-size:10px;color:#80966c;overflow-wrap:anywhere}
+.flow-current .flow-model{max-width:35%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font:9px ui-monospace,monospace;color:#96a685}
+.flow-artifact{padding:12px 23px;border-top:1px solid #e2ead9}.flow-artifact summary{display:flex;align-items:center;justify-content:space-between;color:#7f936a;font-size:10px;cursor:pointer}.flow-artifact .artifact-markdown{max-height:340px;overflow:auto;padding-top:15px}
+.flow-ledger footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:7px;padding:13px 23px;border-top:1px solid #e1e8d9;font:8px/1.7 ui-monospace,monospace;color:#95a185}.flow-validation{color:#6f8859}
+.flow-error{display:flex;align-items:flex-start;gap:8px;padding:13px 23px!important;color:#9f734c!important;font-size:11px!important;overflow-wrap:anywhere;background:#fbf1e4;margin:0!important}.flow-error svg{flex-shrink:0;margin-top:3px}
+.flow-open-draft{margin:0 23px 17px;background:#f0f5e9!important;border-color:#cdddbf!important;font-size:10px!important}
+.studio-start{width:100%;max-width:1050px;margin:20px auto 0;padding:0 0 28px;min-width:0;flex:1}
+.studio-start-rule{display:flex;justify-content:space-between;max-width:600px;gap:12px;padding-bottom:25px;font:8px ui-monospace,monospace;letter-spacing:.12em;color:#8c9880}
+.studio-start h2{font:normal clamp(30px,3.3vw,48px)/1.14 Georgia,'Times New Roman',serif;letter-spacing:-1.3px;color:#344f35;margin:10px 0 24px}
+.studio-start p{font-size:12px;color:#839274;line-height:1.9;margin:0 0 25px}
+.studio-start>button{display:flex;align-items:center;gap:10px;border:1px solid #aebfa0;border-radius:5px;background:transparent;padding:12px 17px;color:#456139;font-size:12px}
+.studio-start>button svg:last-child{margin-left:25px;transform:rotate(45deg)}
+.studio-start-steps{max-width:600px;margin-top:45px;display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--studio-rule);padding-top:17px;gap:20px}
+.studio-start-steps span{font:9px ui-monospace,monospace;color:#a2ae96}.studio-start-steps b{font:11px 'Segoe UI',sans-serif;color:#839575;display:block;margin-top:12px;font-weight:400}
+.ophi-studio .v5-page,.ophi-studio .v5-inspector,.ophi-studio .v5-preferences{background:var(--studio-paper);color:var(--studio-ink);border-color:var(--studio-rule)}
+.ophi-studio :is(.settings-content,.provider-detail,.binding-card,.runtime-control,.v5-active-card,.v7-side-card,.v7-flow-panel,.v7-stat,.v5-chat-bubble){background:#fcfdf6;color:#4c6240;border-color:#d6e0ca;box-shadow:none;border-radius:7px}
+.ophi-studio :is(.settings-top,.settings-content,.provider-detail,.binding-card) :is(h1,h2,h3,h4,strong){color:#405737}
+.ophi-studio :is(.settings-top,.settings-content,.provider-detail,.binding-card) :is(p,small,label){color:#80946c}
+.ophi-studio :is(.provider-option,.settings-nav button,.connect-methods button,.binding-card select,.settings-content input,.vault-panel,.catalog-preview){background:#eff3e8;border-color:#d3dfc6;color:#617b4d;border-radius:5px}
+.ophi-studio :is(.provider-option.active,.settings-nav button.active,.connect-methods button.active,.primary-action){background:#315c4b;color:#f3f7ed;border-color:#315c4b;box-shadow:none}
+.ophi-studio :is(.v5-active-main h2,.v7-engineering-heading h3,.v7-panel-head h4){color:#425a35}.ophi-studio .v5-active-card{background:#edf3e4;border-color:#cbdcb9}
+.ophi-studio .v5-track{background:#d7e3cb}.ophi-studio .v5-track i{background:#6f9655;box-shadow:none}
+.ophi-studio .v5-text-action{color:#77975c}.ophi-studio .v5-owner,.ophi-studio .v5-active-card p{color:#80996a}
+.ophi-studio .runtime-control small{color:#8d9f7c}.ophi-studio .runtime-actions button{background:#edf4e4;border-color:#cbddb8;color:#668f46}
+.ophi-studio .v5-inspector :is(button,.v5-inspector-status,.v5-debug-event){background:#eaf1e1;color:#66854f;border-color:#cbdbb8}
+.ophi-studio .v5-inspector :is(p,small){color:#7b9464}.ophi-studio .v5-inspector-section{border-color:#d6e2ca}
+@keyframes studio-breathe{50%{opacity:.35}}
+@media(min-width:1350px){.ophi-studio .v5-center{padding-left:clamp(28px,4vw,64px);padding-right:clamp(28px,4vw,64px)}}
+@media(max-width:1180px){.ophi-studio .v5-wordmark{flex-basis:150px;min-width:150px}.ophi-studio .v5-topbar{gap:22px;padding:0 20px}.ophi-studio .v5-live{display:none}.ophi-studio .v5-top-actions .v5-mode-toggle{font-size:0;gap:0}.ophi-studio .v5-tabs{gap:18px}}
+@media(max-width:760px){.ophi-studio .v5-topbar{height:60px;min-height:60px;padding:0 12px;gap:12px}.ophi-studio .v5-tabs{height:60px;gap:14px}.ophi-studio .v5-wordmark{display:none}.ophi-studio .v5-dock{width:48px;min-width:48px;padding:14px 4px}.ophi-studio .v5-dock>button{width:37px;height:37px}.ophi-studio .v5-logo{width:37px;font-size:24px}.ophi-studio .v5-center{padding:25px 17px 18px;gap:16px}.ophi-studio .v5-console-heading h1{font-size:25px}.ophi-studio .v5-console-heading p{font-size:10px;max-width:220px}.ophi-studio .v5-console-tools{display:none}.ophi-studio .v5-inspector-open{display:none}.ophi-studio .v5-project-sidebar{box-shadow:10px 0 30px #26342f18}.ophi-studio .v5-composer{margin-top:18px;padding:13px}.ophi-studio .v5-composer-bottom>div span{font-size:8px;max-width:200px}.flow-ledger-head{padding:16px}.flow-stations{padding:18px 15px;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px 8px}.flow-stations li:nth-child(3)::after{display:none}.flow-current{padding:13px 16px}.flow-current .flow-model{display:none}.flow-ledger footer,.flow-artifact{padding:12px 16px}.flow-head-meta>span{display:none}.flow-open-draft{margin-left:16px}.studio-start{margin-top:0}.studio-start-steps{margin-top:30px}.ophi-studio .project-context-bar>span{flex-basis:100%}.ophi-studio .project-task-modes{gap:5px}.ophi-studio .project-task-modes button{font-size:10px;padding:7px}.ophi-studio .project-rail-empty{padding-top:35px}}
+@media(prefers-reduced-motion:reduce){.station-live{animation:none}}
+
+.ophi-studio .has-project{color:inherit}
+.ophi-studio.has-project .v5-console-head{padding-bottom:16px}
+.ophi-studio.has-project .v5-console-heading h1{font-size:25px;margin:7px 0 0}
+.ophi-studio.has-project .v5-console-heading p{display:none}
+.ophi-studio .v5-center{scroll-padding-bottom:175px}
+.ophi-studio .project-chat-end{scroll-margin-bottom:175px}
+.ophi-studio .project-manual-toggle{border:0;background:none;font-size:10px;padding:0;color:#829172;justify-content:flex-start}
+.flow-stations strong{font-size:11px}.flow-stations small{font-size:9px!important}
+.flow-current strong{font-size:12px}.flow-current span{font-size:11px}
+
+@media(max-width:760px){.ophi-studio .v5-top-actions{display:none}.ophi-studio .v5-tabs{width:100%;justify-content:space-between;flex-shrink:1}}
+
+/* The same materials continue through settings, diagnostics and analytics. */
+.ophi-studio .eyebrow{color:#7f8f74;font:9px ui-monospace,monospace;letter-spacing:.12em}
+.ophi-studio :is(.settings-top h1,.dash-top h1){font:normal 32px Georgia,serif;letter-spacing:-.7px;color:#344f35}
+.ophi-studio :is(.settings-banner,.settings-footnote,.demo-explainer){background:transparent;color:#829473;border-color:#d4e0c7}
+.ophi-studio .settings-sidebar{background:#edf2e6;border-color:#d0ddc1;border-radius:6px}
+.ophi-studio .settings-sidebar button{background:transparent;color:#7a9365;border-color:transparent;border-radius:4px;box-shadow:none}
+.ophi-studio .settings-sidebar button.active{background:#dfead4;color:#3c622f;border-color:#c9dcb8}
+.ophi-studio :is(.provider-logo,.binding-avatar,.binding-fixed,.settings-count){background:#e1ebd7;color:#66844d;border-color:#cbdcb9;box-shadow:none}
+.ophi-studio :is(.secret-preview,.provider-search){background:#f4f7ef;border-color:#cfddc2;color:#6a8850}
+.ophi-studio :is(.provider-doc-link,.outline-action,.settings-muted a){color:#668a49}
+.ophi-studio .settings-content :is(select,button,input){border-color:#cfddc2}
+.ophi-studio :is(.v5-mode-cards button,.v5-segment,.v5-reset,.v5-switch-row,.v5-inspector-top button){background:#edf3e5;border-color:#d2dfc4;color:#68864e;border-radius:5px}
+.ophi-studio :is(.v5-mode-cards button.selected,.v5-segment button.selected){background:#dce9cf;border-color:#a6c38b;color:#466e32}
+.ophi-studio :is(.v5-mode-cards small,.v5-preferences-head p,.v5-pref-hint){color:#8ba073}
+.ophi-studio :is(.v5-mode-cards svg,.v5-switch-row span svg){color:#739651}
+.ophi-studio .v5-chat-response p{color:#748b60}
+.ophi-studio :is(.v5-timeline-item,.v7-flow-summary,.v7-side-card,.runtime-artifacts,.ow-artifacts,.artifact-content){background:#f5f9ed;color:#617d49;border-color:#d2e0c3;border-radius:5px}
+.ophi-studio .artifact-markdown{color:#5c7347}.ophi-studio .artifact-markdown pre{background:#edf3e4;color:#5f7c46;border-color:#cfdfbe}
+.ophi-studio .v5-chat-bubble p{color:#607b49}
+.ophi-studio .analytics-page{background:transparent;color:#52703c}
+.ophi-studio :is(.analytics-card,.kpi-card){background:#fcfdf7;border:1px solid #d4e0c9;box-shadow:none;border-radius:7px}
+.ophi-studio :is(.analytics-head h2,.kpi-card strong,.dash-top h1){color:#3f5f30}
+.ophi-studio :is(.analytics-head p,.dash-top p,.kpi-card small,.kpi-card p,.model-label small,.chart-foot,.demo-explainer){color:#8ba072}
+.ophi-studio :is(.kpi-icon,.period-picker,.chart-switch,.dash-console,.dash-pagination button,.model-track,.health-grid>div){background:#edf4e3;border-color:#d0e0bf;color:#729651;box-shadow:none;border-radius:5px}
+.ophi-studio :is(.period-picker button.chosen,.chart-switch button.chosen){background:#315c4b;color:#f2f7eb;box-shadow:none;border-color:#315c4b}
+.ophi-studio .analytics-page th{background:#eff5e6;color:#7f9e60;border-color:#d1e1c0}
+.ophi-studio .analytics-page td{border-color:#e0e9d7;color:#78955a}
+.ophi-studio .model-value,.ophi-studio .model-label strong{color:#4f7537}
+
+.ophi-studio .provider-option.active :is(strong,small){color:#f0f5e9!important}
+.ophi-studio :is(.vault-row button,.vault-actions button){background:#315c4b;color:#f2f6eb;border:1px solid #315c4b;border-radius:5px;box-shadow:none}
+.ophi-studio :is(.vault-row button,.vault-actions button):disabled{background:#dce3d4;color:#87977a;border-color:#d0d9c7;opacity:1}
+.ophi-studio .settings-top button{background:transparent;color:#6b8755;border:1px solid #cbd9bd;box-shadow:none;border-radius:5px}
+.ophi-studio .local-project small{color:#6e7c61}
+.ophi-studio .flow-eyebrow,.ophi-studio .flow-ledger footer,.ophi-studio .flow-stations small{color:#6c7b60!important}
+.ophi-studio .project-rail-footer,.ophi-studio .v5-chat-by{color:#6e7c61}
+.ophi-studio .flow-current span{color:#647951}
+.ophi-studio .donut::after{background:#fcfdf7}.ophi-studio .donut strong{color:#55743b}

@@ -56,6 +56,14 @@ const server=http.createServer(async(req,res)=>{
    try{const path=await pickNativeFolder();return path?json(res,201,await projects.open({path,confirmRead:true})):json(res,200,{cancelled:true});}finally{folderPickerBusy=false;}
   }
   if(req.method==='POST'&&url.pathname==='/projects/open')return json(res,201,await projects.open(await readBody(req)));
+  const flowMatch=url.pathname.match(/^\/projects\/([0-9a-f-]+)\/flows(?:\/([0-9a-f-]+)(?:\/(cancel))?)?$/);
+  if(flowMatch){
+   const [,id,flowId,action]=flowMatch;
+   if(req.method==='POST'&&!flowId)return json(res,202,await projects.startFlow(id,await readBody(req)));
+   if(req.method==='GET'&&!action)return json(res,200,flowId?await projects.flow(id,flowId):await projects.flows(id));
+   if(req.method==='POST'&&action==='cancel')return json(res,200,await projects.cancelFlow(id,flowId));
+   return json(res,405,{error:'Ação do fluxo não permitida'});
+  }
   const projectMatch=url.pathname.match(/^\/projects\/([0-9a-f-]+)(?:\/(tree|file|search|task|close|drafts)(?:\/([0-9a-f-]+)(?:\/(apply|undo|test))?)?)?$/);
   if(projectMatch){
    const [,id,action,draftId,draftAction]=projectMatch;
