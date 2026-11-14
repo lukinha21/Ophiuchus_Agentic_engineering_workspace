@@ -83,8 +83,12 @@ export async function autopilotStep(run,policy,{execute=executeStage,apply=apply
   // The model's textual QA assessment is not a substitute for tests, but is kept as a separate stage.
  }
  if(run.stage==='implementation'){
+  const correctionsBefore=run.corrections;
   await execute(run);
+  // Executor owns rejection accounting; never revalidate a rejected or stale artifact.
+  if(run.status!=='RUNNING'||run.corrections!==correctionsBefore)return {};
   if(run.pendingDraft)return {stop:'Resposta incompleta: continuação necessária antes de gravar arquivos'};
+  if(run.stage==='implementation'&&run.filePlan&&!run.filePlan.complete)return {};
   const artifact=[...(run.artifacts||[])].reverse().find(a=>a.stage==='implementation');
   const proposals=artifact?.fileProposals||[];
   const contract=run.languageContract||stackContract(run.prompt);
@@ -116,7 +120,7 @@ export async function driveAutopilot(run,policy,{step=autopilotStep,persist=asyn
    const before=run.artifacts?.length||0;
    const result=await step(run,policy);
    run.autoPilot.steps++;
-   if((run.artifacts?.length||0)>before||run.pendingDraft)run.autoPilot.calls++;
+   if((run.artifacts||[]).slice(before).some(a=>a.providerId!=='local'&&!a.reusedFrom)||run.pendingDraft)run.autoPilot.calls++;
    await persist();
    if(result?.stop){run.autoPilot.status='PAUSED';run.autoPilot.lastError=result.stop;break;}
    if(run.status==='SUCCESS'){run.autoPilot.status='SUCCESS';break;}

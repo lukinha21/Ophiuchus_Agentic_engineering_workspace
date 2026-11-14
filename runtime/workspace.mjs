@@ -19,6 +19,24 @@ async function ensureSafe(root,path){
  try{const st=await lstat(dest);if(st.isSymbolicLink()||!st.isFile())throw Error('Arquivo inseguro');}catch(e){if(e.code!=='ENOENT')throw e;}
  return dest;
 }
+/** Reject malformed envelopes before any file can reach review or disk. No silent repair. */
+export function validateProposalEnvelope(text){
+ let opened=null;const paths=new Set();let count=0;
+ for(const line of String(text||'').split(/\r?\n/)){
+  if(!line.includes('```'))continue;
+  if(opened){
+   if(!/^\s*```\s*$/.test(line))return {ok:false,reason:'Bloco de arquivo interrompido ou reiniciado; gere novamente arquivos completos, sem concatenar versões.'};
+   opened=null;continue;
+  }
+  const match=line.match(/^\s*```(?:[\w.+-]+)?\s+(?:file|path)\s*[:=]\s*([^`]+?)\s*$/i);
+  if(!match)return {ok:false,reason:'Bloco sem caminho de arquivo ou delimitador inválido; use blocos completos com file:caminho.'};
+  let path;try{path=safePath(match[1]);}catch{return {ok:false,reason:'Caminho de arquivo inválido'};}
+  if(paths.has(path))return {ok:false,reason:`Arquivo duplicado: ${path}. Gere uma única versão completa por caminho.`};
+  paths.add(path);opened=path;count++;
+ }
+ if(opened)return {ok:false,reason:`Arquivo incompleto: ${opened}; falta fechar o bloco.`};
+ return count?{ok:true}:{ok:false,reason:'Nenhum arquivo completo proposto'};
+}
 export function extractProposals(text){
  if(typeof text!=='string')return [];
  const out=[];const pattern=/```(?:[\w.+-]+)?\s+(?:file|path)\s*[:=]\s*([^\n`]+)\n([\s\S]*?)```/gi;

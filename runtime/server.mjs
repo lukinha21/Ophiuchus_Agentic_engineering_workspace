@@ -1,8 +1,10 @@
+import {pickNativeFolder} from './native-folder.mjs';
+import {createProjectService} from './local-project.mjs';
 import {googleOAuthConfig,exchangeGoogleCode} from './google-oauth.mjs';
 import {stackContract} from './stack-contract.mjs';
 /** Local-only control-plane API. No credentials, tools, or provider calls. */
 import http from 'node:http';
-import {readFile,writeFile,mkdir} from 'node:fs/promises';
+import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
 import {resolve,dirname} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {createRun,startRun,completeStage,approve,reportFailure,cancel} from './orchestrator.mjs';
@@ -18,6 +20,10 @@ import {createAutopilotPolicy,driveAutopilot} from './autopilot.mjs';
 const PORT=Number(process.env.OPHIUCHUS_PORT||4317);
 const DB=resolve(process.env.OPHIUCHUS_STATE_FILE||'./.ophiuchus-local/runs.json');
 let runs={};
+let folderPickerBusy=false;
+const projects=createProjectService({onUsage:async report=>{
+ runs[report.id]={id:report.id,type:'project-task',projectId:report.projectId,prompt:'Tarefa de projeto local',createdAt:report.at,status:'DOCUMENTED',stage:'project.'+report.mode,configSnapshot:[],history:[],events:[],artifacts:[{id:report.id+':response',stage:'project.'+report.mode,providerId:report.binding.providerId,model:report.binding.modelId,usage:report.usage,at:report.at,text:'Uso do modelo em projeto local; relatório e rascunho na sessão do projeto.',integrity:'unverified'}]};await save();
+}});
 const executing=new Set();
 const testing=new Set();
 const autopiloting=new Set();
@@ -32,15 +38,39 @@ try{bindings=JSON.parse(await readFile(BINDINGS,'utf8'));}catch(e){if(e.code!=='
 const saveBindings=async()=>{await mkdir(dirname(BINDINGS),{recursive:true});await writeFile(BINDINGS,JSON.stringify(bindings,null,2),{mode:0o600});};
 try{runs=JSON.parse(await readFile(DB,'utf8'));}catch(e){if(e.code!=='ENOENT')throw e;}
 for(const run of Object.values(runs)){if(run.autoPilot?.status==='RUNNING'){run.autoPilot.status='PAUSED';run.autoPilot.lastError='Servidor reiniciado; reinicie a automação com autorização';}}
-const save=async()=>{await mkdir(dirname(DB),{recursive:true});await writeFile(DB,JSON.stringify(runs,null,2));};
+let saving=Promise.resolve();
+const save=()=>{const snapshot=JSON.stringify(runs,null,2);const pending=saving.catch(()=>{}).then(async()=>{await mkdir(dirname(DB),{recursive:true});const temporary=DB+'.'+randomUUID()+'.tmp';await writeFile(temporary,snapshot,{mode:0o600});await rename(temporary,DB);});saving=pending;return pending;};
 const json=(res,code,value)=>{res.writeHead(code,{'content-type':'application/json; charset=utf-8','cache-control':'no-store'});res.end(JSON.stringify(value));};
 const readBody=async(req)=>{let text='';for await(const chunk of req){text+=chunk;if(text.length>1024*1024)throw Error('Payload grande demais');}return JSON.parse(text||'{}');};
 const server=http.createServer(async(req,res)=>{
  try{
   // Reject cross-site browser requests, including local-network origins.
+  if(!/^(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(req.headers.host||''))return json(res,403,{error:'Host local obrigatório'});
   const origin=req.headers.origin;
   if(origin && !/^http:\/\/(localhost|127\.0\.0\.1):(5173|4317)$/.test(origin))return json(res,403,{error:'Origem não autorizada'});
   const url=new URL(req.url,'http://localhost');
+  if(req.method==='GET'&&url.pathname==='/projects/picker')return json(res,200,{supported:process.platform==='win32',platform:process.platform});
+  if(req.method==='POST'&&url.pathname==='/projects/pick'){
+   const body=await readBody(req);if(body.confirmRead!==true)throw Error('A seleção deve autorizar leitura da pasta escolhida');
+   if(folderPickerBusy)return json(res,409,{error:'O seletor de pasta já está aberto'});folderPickerBusy=true;
+   try{const path=await pickNativeFolder();return path?json(res,201,await projects.open({path,confirmRead:true})):json(res,200,{cancelled:true});}finally{folderPickerBusy=false;}
+  }
+  if(req.method==='POST'&&url.pathname==='/projects/open')return json(res,201,await projects.open(await readBody(req)));
+  const projectMatch=url.pathname.match(/^\/projects\/([0-9a-f-]+)(?:\/(tree|file|search|task|close|drafts)(?:\/([0-9a-f-]+)(?:\/(apply|undo|test))?)?)?$/);
+  if(projectMatch){
+   const [,id,action,draftId,draftAction]=projectMatch;
+   if(req.method==='GET'&&!action)return json(res,200,await projects.info(id));
+   if(req.method==='GET'&&action==='tree')return json(res,200,await projects.list(id));
+   if(req.method==='GET'&&action==='file')return json(res,200,await projects.read(id,url.searchParams.get('path')));
+   if(req.method==='GET'&&action==='search')return json(res,200,await projects.search(id,url.searchParams.get('q')));
+   if(req.method==='POST'&&action==='close')return json(res,200,await projects.close(id));
+   if(req.method==='POST'&&action==='task')return json(res,200,await projects.task(id,await readBody(req)));
+   if(action==='drafts'&&draftId){
+    if(req.method==='GET'&&!draftAction)return json(res,200,await projects.draft(id,draftId));
+    if(req.method==='POST'&&['apply','undo','test'].includes(draftAction))return json(res,200,await projects[draftAction](id,draftId,await readBody(req)));
+   }
+   return json(res,405,{error:'Ação do projeto não permitida'});
+  }
   if(req.method==='GET'&&url.pathname==='/health')return json(res,200,{ok:true,service:'ophiuchus-control-plane',providerExecution:true});
   if(req.method==='GET'&&url.pathname==='/providers')return json(res,200,listProviders());
   if(req.method==='GET'&&url.pathname==='/vault')return json(res,200,await vaultStatus());
@@ -159,7 +189,7 @@ const server=http.createServer(async(req,res)=>{
    try{await executeStage(run);await save();return json(res,200,run);}
    finally{executing.delete(run.id);}
   }
-  if(match[2]==='cancel'&&autopiloting.has(run.id))autoStops.add(run.id);
+  if(match[2]==='cancel'){autoStops.add(run.id);cancel(run);await save();return json(res,200,run);}
   if(executing.has(run.id)||testing.has(run.id)||autopiloting.has(run.id))return json(res,409,{error:'Aguarde a operação terminar'});
   switch(match[2]){
    case 'discard-draft':run.pendingDraft=null;break;

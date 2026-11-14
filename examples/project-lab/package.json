@@ -1,0 +1,6 @@
+{
+  "name": "ophiuchus-project-lab",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test" }
+}

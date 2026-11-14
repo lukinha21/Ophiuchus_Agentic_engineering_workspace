@@ -141,3 +141,26 @@
 .artifact-code code{background:none;padding:0}.artifact-table-scroll{overflow-x:auto;margin:12px 0}
 .artifact-table-scroll table{border-collapse:collapse;width:100%;min-width:360px}.artifact-table-scroll th,.artifact-table-scroll td{padding:7px 10px;border:1px solid #3c4261;text-align:left;vertical-align:top}.artifact-table-scroll th{background:rgba(130,130,180,.14)}
 .runtime-draft{margin:10px 0;padding:12px;border:1px solid #a86d31;border-radius:9px}.runtime-draft p{margin:6px 0}
+
+/* Keep long generated content inside its own reading surface. */
+.v5-app .v5-center,.v5-app .runtime-control,.v5-app .ow-artifacts,
+.v5-app #artifact-history-list,.v5-app .runtime-artifacts details,
+.v5-app .artifact-content,.v5-app .artifact-markdown{min-width:0;max-width:100%;width:100%}
+.v5-app .runtime-artifacts{display:block;overflow:hidden}
+.v5-app .runtime-artifacts details{margin-bottom:10px;overflow:hidden}
+.v5-app .artifact-content{max-height:min(60vh,520px);overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:12px 4px 4px;overflow-wrap:anywhere}
+.v5-app .artifact-content:focus-visible{outline:2px solid #9981ff;outline-offset:-2px;border-radius:8px}
+.v5-app .artifact-markdown p,.v5-app .artifact-markdown li,.v5-app .artifact-markdown a,
+.v5-app .artifact-meta,.v5-app .artifact-markdown code{overflow-wrap:anywhere;word-break:normal}
+.v5-app .artifact-code{min-width:0;max-width:100%;overflow:hidden}
+.v5-app .artifact-code>span{overflow-wrap:anywhere}
+.v5-app .artifact-code pre{min-width:0;max-width:100%;white-space:pre;overflow:auto;max-height:360px;overscroll-behavior:contain}
+.v5-app .artifact-code pre code{white-space:inherit;overflow-wrap:normal;word-break:normal}
+.v5-app .artifact-table-scroll{min-width:0;max-width:100%;overflow:auto}
+.v5-app .runtime-artifacts summary{display:flex;gap:10px;align-items:center;flex-wrap:wrap;min-width:0;max-width:100%;overflow-wrap:anywhere}
+.v5-app .ow-artifact-model{min-width:0;overflow-wrap:anywhere;flex:1}
+.v5-app .ow-artifact-tokens{flex-shrink:0}
+.v5-app .v5-chat-avatar.user{width:44px;height:44px;min-width:44px;border-radius:50%;color:#e9e3ff;background:radial-gradient(circle at 30% 20%,#a185e6,#57428b 65%,#30274e);border:1px solid #a58be56b;box-shadow:inset 0 1px 1px #ffffff35,0 4px 16px #6844ac30}
+.v5-app .v5-track i,.v5-app .v7-meter i,.v5-app .v7-flow-progress i{transition:width .6s ease}
+@media(prefers-reduced-motion:reduce){.v5-app .v5-track i,.v5-app .v7-meter i,.v5-app .v7-flow-progress i{transition:none}}
+.v5-reduced .v5-track i,.v5-reduced .v7-meter i,.v5-reduced .v7-flow-progress i{transition:none}

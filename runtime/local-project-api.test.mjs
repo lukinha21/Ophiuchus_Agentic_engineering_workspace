@@ -1,0 +1,27 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {spawn} from 'node:child_process';
+import {mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join,resolve} from 'node:path';
+import net from 'node:net';
+test('local project HTTP grant, search, read, revocation and origin checks',async t=>{
+ const dir=await mkdtemp(join(tmpdir(),'ophi-api-project-'));const root=join(dir,'repo');await mkdir(root);await writeFile(join(root,'main.mjs'),'export const value=42;');
+ const port=await new Promise((ok,fail)=>{const s=net.createServer();s.on('error',fail);s.listen(0,'127.0.0.1',()=>{const p=s.address().port;s.close(()=>ok(p));});});
+ const proc=spawn(process.execPath,[resolve('runtime/server.mjs')],{env:{...process.env,OPHIUCHUS_PORT:String(port),OPHIUCHUS_STATE_FILE:join(dir,'state.json'),OPHIUCHUS_BINDINGS_FILE:join(dir,'bindings.json'),OPHIUCHUS_OPTIONS_FILE:join(dir,'options.json'),OPHIUCHUS_PROJECTS_DIR:join(dir,'snapshots')},stdio:['ignore','pipe','pipe']});
+ t.after(async()=>{proc.kill();await new Promise(r=>proc.once('exit',r));await rm(dir,{recursive:true,force:true})});
+ await new Promise((ok,fail)=>{const timer=setTimeout(()=>fail(Error('API startup timeout')),5000);proc.stdout.on('data',()=>{clearTimeout(timer);ok()});proc.once('error',fail);proc.once('exit',code=>{clearTimeout(timer);fail(Error('API startup exit '+code))})});
+ const base='http://127.0.0.1:'+port;
+ const request=async(path,body,headers={})=>{const res=await fetch(base+path,{method:body?'POST':'GET',headers:{'content-type':'application/json',...headers},body:body?JSON.stringify(body):undefined});return {status:res.status,data:await res.json()}};
+ assert.equal((await request('/projects/open',{path:root,confirmRead:true},{origin:'https://untrusted.example'})).status,403);
+ assert.equal((await request('/projects/open',{path:root,confirmRead:false})).status,400);
+ assert.equal((await request('/projects/picker')).data.platform,process.platform);
+ assert.equal((await request('/projects/pick',{confirmRead:false})).status,400);
+ if(process.platform!=='win32')assert.equal((await request('/projects/pick',{confirmRead:true})).status,400);
+ const opened=await request('/projects/open',{path:root,confirmRead:true});assert.equal(opened.status,201);const id=opened.data.id;assert.deepEqual(opened.data.files.map(f=>f.path),['main.mjs']);
+ assert.match((await request(`/projects/${id}/file?path=main.mjs`)).data.content,/value=42/);
+ assert.equal((await request(`/projects/${id}/search?q=value`)).data.hits[0].path,'main.mjs');
+ assert.equal((await request(`/projects/${id}`)).data.root,root);
+ assert.equal((await request(`/projects/${id}/task`,{goal:'inspect',mode:'analyse',binding:{providerId:'google',modelId:'test'},confirmSend:false})).status,400);
+ assert.equal((await request(`/projects/${id}/close`,{})).status,200);assert.equal((await request(`/projects/${id}/tree`)).status,400);
+});

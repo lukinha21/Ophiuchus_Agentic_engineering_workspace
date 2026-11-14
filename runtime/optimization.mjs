@@ -7,9 +7,12 @@ export function normalizeOptions(value={}){
 }
 /** Preserve requirements and decisions, but never resend generated source from old artifacts.
  * Full canonical source is sent separately by sourceSnapshot for review/QA/developer corrections. */
-export function compactHistory(artifacts,options){
+export function compactHistory(artifacts,options,{stage}={}){
  const cfg=normalizeOptions(options);
- const selected=(artifacts||[]).filter(a=>['discovery','specification','architecture','review','qa'].includes(a.stage)).slice(-5);
+ const allowed=stage==='discovery'?[]:stage==='specification'?['discovery']:stage==='architecture'?['specification']:stage==='implementation'?['specification','architecture','review','qa']:stage==='review'||stage==='qa'?['specification']:['specification','qa'];
+ const candidates=(artifacts||[]).filter(a=>!stage||allowed.includes(a.stage));
+ const latest=new Map();for(const a of candidates)if(['discovery','specification','architecture','review','qa'].includes(a.stage))latest.set(a.stage,a);
+ const selected=[...latest.values()].slice(-5);
  const limit=cfg.mode==='aggressive'?500:cfg.mode==='balanced'?800:1100;
  return selected.map(a=>{
   const raw=String(a.text||'').replace(/```[^\n]*\n[\s\S]*?```/g,'[bloco de código omitido: consulte fonte canônica]');
