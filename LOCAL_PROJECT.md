@@ -7,7 +7,7 @@
 3. No Console, use **Abrir pasta** no explorador lateral. No Windows, a API abre o seletor nativo de pastas via Windows PowerShell/Windows Forms; a seleção autoriza a leitura local dessa pasta. Cancelar a janela não abre projeto algum. Se a janela não estiver disponível (ou em outro sistema), o painel oferece entrada manual do caminho absoluto. A API deve rodar no mesmo computador em que você quer escolher a pasta.
 4. A árvore aparece na lateral, no lugar da lista visual de agentes. Ela mostra somente os arquivos de texto permitidos. O início da aplicação permanece sem projeto aberto.
 5. Use busca literal por nome ou conteúdo. Abra arquivos para conferir e marque até 8 para controlar o contexto, ou deixe a seleção automática localizar os mais relevantes ao pedido.
-6. No console central, em **Contexto e permissões**, escolha **Analisar** ou **Propor alteração** e escreva o pedido no campo principal do chat. Autorize explicitamente o envio do pedido, dos caminhos e do conteúdo ao provedor configurado. Cada tarefa usa uma chamada limitada; não executa o pipeline completo de sete etapas.
+6. No console central, em **Contexto e permissões**, escolha **Analisar** ou **Propor alteração** e escreva o pedido no campo principal do chat. Autorize explicitamente o envio do pedido, dos caminhos e do conteúdo ao provedor configurado. Cada tarefa usa uma chamada limitada; propostas truncadas permitem uma única recuperação automática, com escopo reduzido e possível custo adicional; não executa o pipeline completo de sete etapas.
 7. Revise a proposta por arquivo. Ela já está numa cópia isolada, mas ainda não foi aplicada ao projeto original.
 8. Opcionalmente autorize testes Node.js na cópia via Docker. Só são suportados testes nativos node:test, sem instalar dependências. Falta de Docker/dependências é apresentada como falha de execução, sem aprovação inferida.
 9. Autorize gravação e clique em **Aplicar este arquivo**. **Desfazer este arquivo** recupera a versão do snapshot, ou remove um arquivo novo criado pela própria proposta. Alterações manuais posteriores bloqueiam o desfazer.
@@ -33,3 +33,11 @@ Abra `examples/project-lab`, incluído no pacote. Ele contém uma pequena funç�
 ## Validação desta versão
 
 Testes automatizados cobrem autorização de leitura/envio/gravação/execução; arquivos omitidos; busca e contexto; snapshots; isolamento de escrita; aplicação; desfazer; conflitos; links; truncamento; revogação e rotas HTTP. Chamadas ao modelo e ao Docker são substituídas por respostas controladas nesses testes. Isso verifica o runtime, não a qualidade de uma nova geração nem a compatibilidade com todo projeto real.
+
+## Recuperação limitada de propostas truncadas
+
+- A primeira chamada pede trechos curtos e uma melhoria coerente. Se o provedor informar limite de saída, a resposta é guardada para diagnóstico e descartada integralmente.
+- Há no máximo uma nova chamada, restrita ao primeiro arquivo do contexto (ordem da seleção ou do ranking automático), com até três substituições. O runtime rejeita conteúdo integral, arquivos novos ou outros caminhos nessa recuperação. A síntese avisa que o escopo foi reduzido; isso não significa que todo o pedido foi concluído.
+- As duas chamadas mantêm o limite de 4.096 tokens de saída cada e compartilham prazo de 90 segundos. Não há continuação de JSON incompleto, loop de tentativas nem repetição automática de erros HTTP, JSON inválido ou análises truncadas.
+- O dashboard registra cada tentativa separadamente e a proposta exibe o total informado pelas duas respostas, quando disponível. Respostas originais ficam em `response.json` e `response-retry.json` no mesmo snapshot; eventos registram motivo de término e número da tentativa.
+- Gravação no original e testes continuam exigindo suas autorizações separadas. Recuperação não aplica arquivos.

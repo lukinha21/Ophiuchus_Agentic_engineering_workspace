@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 ## Atualização 2.6.2 — conversa contínua no projeto
 
 O console do projeto mantém mensagens em sequência e reutiliza até seis mensagens recentes (até 1.800 caracteres cada) como contexto. “Novo chat” limpa a conversa, o campo de texto e as permissões de escrita/testes; mantém a pasta aberta e não desfaz arquivos já aplicados. O histórico da conversa fica em memória enquanto a aplicação está aberta.
@@ -31,8 +30,6 @@ Guia completo: [LOCAL_PROJECT.md](LOCAL_PROJECT.md). Primeiro teste: abra [examp
 
 Atualize arquivos, execute npm ci e reinicie API/frontend. Não apague seu diretório .ophiuchus-local ao atualizar.
 
-=======
->>>>>>> 31a282fb43e7810ce5e577698cdb29bbe2af6469
 ## Atualização 2.5.15 — estabilidade visual e sessão de trabalho
 
 - Artefatos têm área de leitura limitada com rolagem interna vertical; código e tabelas longos rolam horizontalmente dentro do painel. Contêineres flex/grid deixam de herdar largura mínima do conteúdo. Avatar circular com ícone de pessoa substitui o texto Você.
