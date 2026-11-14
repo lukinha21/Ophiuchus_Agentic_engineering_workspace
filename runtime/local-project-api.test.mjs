@@ -8,7 +8,7 @@ import net from 'node:net';
 test('local project HTTP grant, search, read, revocation and origin checks',async t=>{
  const dir=await mkdtemp(join(tmpdir(),'ophi-api-project-'));const root=join(dir,'repo');await mkdir(root);await writeFile(join(root,'main.mjs'),'export const value=42;');
  const port=await new Promise((ok,fail)=>{const s=net.createServer();s.on('error',fail);s.listen(0,'127.0.0.1',()=>{const p=s.address().port;s.close(()=>ok(p));});});
- const proc=spawn(process.execPath,[resolve('runtime/server.mjs')],{env:{...process.env,OPHIUCHUS_PORT:String(port),OPHIUCHUS_STATE_FILE:join(dir,'state.json'),OPHIUCHUS_BINDINGS_FILE:join(dir,'bindings.json'),OPHIUCHUS_OPTIONS_FILE:join(dir,'options.json'),OPHIUCHUS_PROJECTS_DIR:join(dir,'snapshots')},stdio:['ignore','pipe','pipe']});
+ const proc=spawn(process.execPath,[resolve('runtime/server.mjs')],{env:{...process.env,OPHIUCHUS_PORT:String(port),OPHIUCHUS_STATE_FILE:join(dir,'state.json'),OPHIUCHUS_BINDINGS_FILE:join(dir,'bindings.json'),OPHIUCHUS_OPTIONS_FILE:join(dir,'options.json'),OPHIUCHUS_PROJECTS_DIR:join(dir,'snapshots'),OPHIUCHUS_VAULT_FILE:join(dir,'no-vault.enc'),GEMINI_API_KEY:'',OPENAI_API_KEY:'',OPENROUTER_API_KEY:'',ANTHROPIC_API_KEY:''},stdio:['ignore','pipe','pipe']});
  t.after(async()=>{proc.kill();await new Promise(r=>proc.once('exit',r));await rm(dir,{recursive:true,force:true})});
  await new Promise((ok,fail)=>{const timer=setTimeout(()=>fail(Error('API startup timeout')),5000);proc.stdout.on('data',()=>{clearTimeout(timer);ok()});proc.once('error',fail);proc.once('exit',code=>{clearTimeout(timer);fail(Error('API startup exit '+code))})});
  const base='http://127.0.0.1:'+port;
@@ -23,5 +23,12 @@ test('local project HTTP grant, search, read, revocation and origin checks',asyn
  assert.equal((await request(`/projects/${id}/search?q=value`)).data.hits[0].path,'main.mjs');
  assert.equal((await request(`/projects/${id}`)).data.root,root);
  assert.equal((await request(`/projects/${id}/task`,{goal:'inspect',mode:'analyse',binding:{providerId:'google',modelId:'test'},confirmSend:false})).status,400);
+ assert.equal((await request(`/projects/${id}/flows`,{goal:'inspect',confirmSend:false})).status,400);
+ const flowBindings=Object.fromEntries(['orchestrator','architect','developer','reviewer','qa','documentation'].map(role=>[role,{providerId:'google',modelId:'fixture'}]));
+ const started=await request(`/projects/${id}/flows`,{goal:'inspect',paths:['main.mjs'],bindings:flowBindings,confirmSend:true});assert.equal(started.status,202);
+ let flow;for(let i=0;i<100;i++){flow=(await request(`/projects/${id}/flows/${started.data.id}`)).data;if(flow.status==='FAILED')break;await new Promise(r=>setTimeout(r,10));}
+ assert.equal(flow.status,'FAILED');assert.match(flow.error,/não configurado/);assert.equal(flow.calls,1);assert.equal((await request(`/projects/${id}/flows`)).data.length,1);
+ assert.equal((await request(`/projects/${id}/flows/${started.data.id}/cancel`,{})).data.status,'FAILED');
+ const other=(await request('/projects/open',{path:root,confirmRead:true})).data;assert.equal((await request(`/projects/${other.id}/flows/${started.data.id}`)).status,400);await request(`/projects/${other.id}/close`,{});
  assert.equal((await request(`/projects/${id}/close`,{})).status,200);assert.equal((await request(`/projects/${id}/tree`)).status,400);
 });

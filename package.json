@@ -1,12 +1,13 @@
 {
   "name": "ophiuchus-pilot",
   "private": true,
-  "version": "2.6.2",
+  "version": "2.7.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
+    "preview:studio": "vite build --config vite.studio.config.mjs --configLoader runner && vite preview --config vite.studio.config.mjs --configLoader runner",
     "test:runtime": "node --test runtime/*.test.mjs",
     "api": "node runtime/server.mjs"
   },

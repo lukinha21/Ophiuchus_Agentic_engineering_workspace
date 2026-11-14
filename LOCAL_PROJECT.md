@@ -41,3 +41,23 @@ Testes automatizados cobrem autorização de leitura/envio/gravação/execução
 - As duas chamadas mantêm o limite de 4.096 tokens de saída cada e compartilham prazo de 90 segundos. Não há continuação de JSON incompleto, loop de tentativas nem repetição automática de erros HTTP, JSON inválido ou análises truncadas.
 - O dashboard registra cada tentativa separadamente e a proposta exibe o total informado pelas duas respostas, quando disponível. Respostas originais ficam em `response.json` e `response-retry.json` no mesmo snapshot; eventos registram motivo de término e número da tentativa.
 - Gravação no original e testes continuam exigindo suas autorizações separadas. Recuperação não aplica arquivos.
+
+## Equipe completa — versão 2.7.0
+
+O modo padrão agora é **Equipe completa · 6 agentes**. Antes de enviar, configure e habilite Orquestrador, Arquiteto, Desenvolvedor, Revisor, QA e Documentação em Agentes e modelos. Cada execução congela os seis vínculos de modelo; mudar a configuração não altera o fluxo em andamento.
+
+A sequência é Direção → Estrutura → Implementação → Revisão → Critérios → Entrega. O Orquestrador define o plano e critérios, o Arquiteto define contratos, e o Desenvolvedor prepara uma proposta isolada usando as saídas anteriores. Revisor e QA recebem os arquivos propostos completos, com os originais; a Documentação recebe esses arquivos e os pareceres. Arquivos que mudarem durante o planejamento bloqueiam a implementação; alterações posteriores ainda são protegidas pelos hashes na aplicação.
+
+- A autorização de envio cobre até **7 chamadas**: uma por agente mais uma recuperação limitada do Desenvolvedor, somente em truncamento. Não há repetição automática de HTTP 429/503, nem de parecer inválido. Cada etapa tem limite de saída e prazo de 90 segundos; a execução tem prazo total de 8 minutos.
+- Cada modelo faz uma etapa em sequência. Não são seis processos com ferramentas livres: os agentes não executam comandos nem gravam no original. O runtime faz os repasses e valida os resultados.
+- Pareceres exigem verdict, síntese e evidência textual. Revisor ou QA podem bloquear o fluxo. Parecer inválido, truncamento em outra etapa, erro de provedor ou orçamento excedido interrompem a execução. Não há correção automática em loop; faça um novo pedido com o diagnóstico para preparar outra proposta.
+- Um fluxo só permite aplicar sua proposta depois que todas as etapas terminam e os dois pareceres passam. **READY significa revisão estática concluída, não teste executado nem alteração aplicada.** Testes Docker e gravação/desfazer continuam com consentimentos e ações separados.
+- O registro no chat mostra a etapa e os estados informados pelo backend, sem porcentagem estimada. Clique em uma estação para consultar seu artefato. A seção de execuções preserva o histórico durante a sessão, inclusive depois de Novo chat. Logs e respostas ficam em `projects/<sessão>/flows/<fluxo>.json` e no snapshot de implementação. Sessões e fluxos ativos não são recuperados automaticamente após reiniciar a API.
+- Parar cancela o sinal da chamada e impede repasses posteriores. O projeto permanece ocupado até o encerramento da operação, pois uma requisição já enviada pode consumir tokens. Escrita nunca é disparada ao terminar ou cancelar.
+- Os modos Analisar e Edição direta continuam disponíveis para pedidos com apenas o Desenvolvedor. Trocar o modo exige renovar a autorização de envio.
+
+### Prévia visual sem custos
+
+Execute `npm run preview:studio` e abra `http://127.0.0.1:5195/preview.html`. Essa entrada usa App, ProjectPanel e ProjectFlow reais com transporte inteiramente simulado. Um banner permanente identifica a simulação. Nenhuma chamada sai para modelos e nenhum arquivo real é lido ou gravado pela prévia. O bundle fica em `.studio-preview`, separado de `dist`; não faz parte do aplicativo de produção.
+
+Cenários: `?state=review` mantém o Revisor em atividade; `?state=ready` mostra o fluxo completo; `?state=blocked` mostra uma rejeição. Sem parâmetro, a trilha avança em intervalos simulados. Abra o projeto demonstrativo, autorize o envio simulado e mande uma mensagem para observar o widget.
