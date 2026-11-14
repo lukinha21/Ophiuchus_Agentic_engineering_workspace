@@ -20,7 +20,8 @@ const draft=()=>({id:draftId,workflowId:flowId,goal:'Simplifique a navegação.'
 window.fetch=async(input,init)=>{
  const url=new URL(typeof input==='string'?input:input instanceof Request?input.url:input.toString(),location.origin),path=url.pathname.replace(/^\/api/,'')
  let data:unknown={error:'Rota ausente na simulação'},status=200
- if(path==='/health')data={ok:true}
+ if(path==='/projects/picker/cancel')data={cancelled:true}
+ else if(path==='/health')data={ok:true}
  else if(path==='/bindings')data=bindings
  else if(path==='/projects/pick'||path==='/projects/open'||path===`/projects/${project.id}`)data=project
  else if(path.endsWith('/tree'))data={files:project.files,warnings:[]}

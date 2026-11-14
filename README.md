@@ -1,3 +1,9 @@
+## Atualização 2.7.1 — tema Black e abertura de projetos
+
+Tema Claro/Black alternável no cabeçalho e persistido no navegador. O seletor Windows passa a exibir/ativar a janela proprietária antes do diálogo, usa inicialização sinalizada e separa os prazos de abertura/escolha. Há cancelamento pelo aplicativo e caminho manual acessível sem aguardar o timeout. Erros do helper recebem códigos HTTP específicos.
+
+O seletor real exige API iniciada no computador do usuário; a prévia simulada não abre pastas reais. Reinicie a API após atualizar o backend. Guia e limitações: [LOCAL_PROJECT.md](LOCAL_PROJECT.md).
+
 ## Atualização 2.7.0 — equipe no projeto e Ophiuchus Studio
 
 Projetos locais agora oferecem uma equipe de seis agentes em sequência, com plano, arquitetura, proposta isolada, revisão independente, QA estático e documentação. O registro no chat acompanha estados reais, permite inspecionar os artefatos e cancelar; gravação e testes permanecem separados. Até 7 chamadas autorizadas por fluxo, sem repetição ilimitada. Reprovações e respostas inválidas bloqueiam a aplicação.

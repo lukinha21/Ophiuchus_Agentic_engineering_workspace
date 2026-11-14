@@ -61,3 +61,13 @@ A sequência é Direção → Estrutura → Implementação → Revisão → Cri
 Execute `npm run preview:studio` e abra `http://127.0.0.1:5195/preview.html`. Essa entrada usa App, ProjectPanel e ProjectFlow reais com transporte inteiramente simulado. Um banner permanente identifica a simulação. Nenhuma chamada sai para modelos e nenhum arquivo real é lido ou gravado pela prévia. O bundle fica em `.studio-preview`, separado de `dist`; não faz parte do aplicativo de produção.
 
 Cenários: `?state=review` mantém o Revisor em atividade; `?state=ready` mostra o fluxo completo; `?state=blocked` mostra uma rejeição. Sem parâmetro, a trilha avança em intervalos simulados. Abra o projeto demonstrativo, autorize o envio simulado e mande uma mensagem para observar o widget.
+
+## Temas e seletor Windows — 2.7.1
+
+Use o botão de lua/sol no cabeçalho para alternar entre Claro e Black. A preferência fica em `ophiuchus.theme` no localStorage do navegador e é restaurada ao recarregar. Ela não altera as credenciais nem os vínculos dos modelos.
+
+Abrir pasta chama uma janela gráfica de pastas do Windows; não é uma janela de console para digitar comandos. A janela proprietária do diálogo é criada, mostrada e ativada antes de exibir o seletor. O helper usa script fixo codificado em UTF-16, sem interpolar caminhos ou comandos do usuário, e sinaliza quando inicializa. A abertura tem prazo de 15 segundos e a escolha tem prazo de 120 segundos. Timeout é identificado por HTTP 408 / PICKER_TIMEOUT; indisponibilidade do processo usa HTTP 503 / PICKER_UNAVAILABLE, em vez de erro genérico 400.
+
+Enquanto o seletor aguarda, Cancelar seletor e informar caminho encerra o helper e mostra o campo manual. Informar caminho manualmente também está disponível antes de tentar o diálogo. Abrir pelo caminho exige autorizar a leitura da pasta e aplica as mesmas regras de isolamento. Cancelar o diálogo não autoriza pasta alguma.
+
+A prévia `/preview.html` usa dados simulados e não abre o seletor real. Para escolher uma pasta real, use o aplicativo normal (`http://127.0.0.1:5173`) com a API local em execução. Após atualizar o código do backend, reinicie `npm run api` no seu terminal para carregar a correção; não é necessário apagar o cofre ou qualquer histórico. A abertura real da janela foi confirmada pelo usuário após atualizar os arquivos e reiniciar a API. A captura automatizada de janelas não detectou esse diálogo; essa confirmação não equivale a um teste automatizado de navegação e seleção de pastas.

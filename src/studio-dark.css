@@ -1,0 +1,95 @@
+/* The same Studio materials in black; theme is scoped to the application. */
+.studio-theme-toggle{display:grid;place-items:center;flex-shrink:0;width:34px;height:34px;border:1px solid var(--studio-rule);border-radius:5px;background:transparent;color:var(--studio-ink);cursor:pointer}
+.studio-theme-toggle:hover{background:var(--studio-soft)}
+.project-picker-note{border-left:2px solid var(--studio-green);padding-left:10px;max-width:100%}
+.project-picker-note p{font-size:11px!important}.project-picker-note button{white-space:normal;text-align:left}
+.ophi-studio.theme-dark{color-scheme:dark;--studio-paper:#080b09;--studio-surface:#101611;--studio-ink:#e2e9df;--studio-muted:#9aab93;--studio-rule:#29342a;--studio-green:#a5c794;--studio-soft:#1c281d;--studio-alert:#e6b191}
+.theme-dark .v5-dock{background:#050806}
+.theme-dark .v5-dock>button.active{background:#263c2a;color:#d3e8c8}
+.theme-dark :is(.v5-wordmark strong,.v5-console-heading h1,.studio-start h2,.project-rail-empty h2,.project-root-name,.project-context-bar,.project-chat-empty h2,.project-draft h2){color:#e0ebda}
+.theme-dark :is(.v5-wordmark small,.v5-console-heading p,.v5-live,.v5-kicker,.studio-start-rule,.studio-start p,.studio-start-steps span,.studio-start-steps b,.rail-index,.project-rail-empty p,.project-rail-heading,.project-rail-footer,.v5-chat-by){color:#93a38a}
+.theme-dark :is(.v5-project-sidebar,.v5-page,.v5-inspector,.v5-preferences){background:#0b100c;border-color:#263128}
+.theme-dark .v5-tabs button{color:#90a28a}.theme-dark .v5-tabs button.active{color:#d5e8c9;border-color:#a1c98c}
+.theme-dark .v5-top-actions button,.theme-dark .v5-inspector-open{background:#101711;color:#a9bea0;border-color:#2d3b2c}
+.theme-dark .v5-composer{background:#101711;border-color:#344531;box-shadow:none}
+.theme-dark .v5-composer textarea{color:#e3eddd}.theme-dark .v5-composer textarea::placeholder{color:#7f9277}
+.theme-dark .v5-composer-bottom>div,.theme-dark .v5-composer-bottom>div button{color:#8ba17f}
+.theme-dark .v5-send{background:#a1c88d!important;color:#142310!important}
+.theme-dark .v5-send:disabled{background:#263424!important;color:#75876a!important}
+.theme-dark .local-project{color:#d7e4cf}
+.theme-dark .local-project p,.theme-dark .local-project label{color:#a1b495}
+.ophi-studio.theme-dark .local-project small{color:#93a986}
+.theme-dark .local-project code{color:#c0d5af}
+.theme-dark .local-project button{background:#152014;color:#bdcfb0;border-color:#35472e}
+.theme-dark .local-project button:hover{background:#233320}
+.theme-dark .local-project input:not([type=checkbox]),.theme-dark .local-project textarea,.theme-dark .local-project select{background:#0a1109;border-color:#34472c;color:#d7e8c8}
+.theme-dark .project-rail-search input{background:#10180d!important;border-color:#2b3c24!important;color:#bbd4ac!important}
+.theme-dark .project-rail .project-open-native{color:#c0d6b1;border-color:#425b35;background:transparent}
+.theme-dark .project-manual-toggle{color:#9bb48b;background:transparent}
+.theme-dark .project-tree-level details>summary{color:#a0bc8d}.theme-dark .project-tree-level .project-tree-level{border-color:#2a3b23}
+.theme-dark .project-context-bar span{color:#94ac83}.theme-dark .project-context-bar button{background:transparent}
+.theme-dark .project-console-permission{background:#10190c;border-color:#2c3f23}.theme-dark .project-console-permission summary{color:#bdd1ad}
+.theme-dark .project-console-permission .project-check{color:#a4bd91}
+.theme-dark .project-task-modes .selected{background:#a1c88d;border-color:#a1c88d;color:#15260e}
+.theme-dark .project-chat-thread .user .project-message{background:#1b2a14;border-color:#304528;color:#cfdfc1}
+.theme-dark .project-message{color:#c6dabb}.theme-dark .project-message-error{color:#e4b398;border-color:#b38664}
+.theme-dark .v5-chat-avatar{background:#1d2e16;color:#bdd8aa;box-shadow:none}.theme-dark .v5-chat-avatar.user{background:#182414;color:#9bb58b;box-shadow:none}
+.theme-dark .local-project .artifact-markdown,.theme-dark .local-project .artifact-markdown p,.theme-dark .artifact-markdown{color:#b4cca3}
+.theme-dark .artifact-markdown :is(h1,h2,h3,h4){color:#d7eac7}
+.theme-dark .local-project pre,.theme-dark .artifact-markdown pre{background:#0b1408;color:#bddaa7;border-color:#2d4321}
+.theme-dark :is(.project-draft,.project-preview,.project-change){background:#0f190b;border-color:#334c26}
+.theme-dark :is(.project-preview header,.project-change summary){background:#182710;color:#c0daa9}
+.theme-dark .project-change summary span{color:#95b87b}
+.theme-dark .project-diff .diff-add{background:#1a3310;color:#a5d787}.theme-dark .project-diff .diff-remove{background:#332117;color:#ddb08b}
+.theme-dark :is(.project-context,.project-tests,.project-flow-history){border-color:#2d4521;color:#9cbb84}
+.theme-dark .project-test-pass{background:#172d0c;border-color:#3d6425;color:#abd38b}
+.theme-dark .project-working{background:#17270f;border-color:#3c5b29;color:#badba1}.theme-dark .project-working span{color:#98b980}
+.theme-dark .project-error,.theme-dark .project-toast{background:#281e14;border-color:#866340;color:#e4bd99;box-shadow:0 8px 35px #0006}
+.theme-dark .project-toast p,.theme-dark .project-toast button{color:#d1ad87}
+.theme-dark .flow-ledger{background:#0f190c;border-color:#354b2a;color:#ccdfbc}
+.theme-dark :is(.flow-ledger-head,.flow-artifact,.flow-ledger footer){border-color:#2b4121}
+.theme-dark .flow-sign{color:#bdd9a5;border-color:#3d592c}.theme-dark .flow-head-meta>span{color:#92b279}
+.theme-dark .station-marker{background:#0f190c;border-color:#365029;color:#91b279}
+.theme-dark .flow-stations li:not(:last-child)::after{background:#354e28}
+.theme-dark .flow-stations strong{color:#a3bf8b}
+.theme-dark .station-completed .station-marker{background:#233b17;color:#b3df90;border-color:#42672a}
+.theme-dark .station-completed::after{background:#496b30!important}
+.theme-dark .station-running .station-marker{background:#a3ca83;border-color:#a3ca83;color:#182b0d}
+.theme-dark .station-live{background:#1c350d}.theme-dark .station-running strong,.theme-dark .flow-stations [aria-current=step] strong{color:#d2eac1}
+.theme-dark .station-blocked .station-marker,.theme-dark .station-failed .station-marker{background:#302414;color:#e3ba86;border-color:#89683c}
+.theme-dark .flow-current{background:#1a2b12;border-color:#334e25}
+.ophi-studio.theme-dark .flow-current span{color:#a9c78e}
+.ophi-studio.theme-dark .flow-eyebrow,.ophi-studio.theme-dark .flow-ledger footer,.ophi-studio.theme-dark .flow-stations small{color:#92af7c!important}
+.theme-dark .flow-artifact summary{color:#a3c184}.theme-dark .flow-validation{color:#b1ce92}
+.theme-dark .flow-error{background:#2c2114;color:#dcb687!important}
+.theme-dark .flow-open-draft{background:#223618!important;border-color:#486c30!important;color:#bbd99e}
+.theme-dark :is(.studio-start>button,.studio-start-steps){border-color:#3a532a;color:#b6cf9e}
+.theme-dark :is(.settings-content,.provider-detail,.binding-card,.runtime-control,.v5-active-card,.v7-side-card,.v7-flow-panel,.v7-stat,.v5-chat-bubble,.analytics-card,.kpi-card){background:#10190c;color:#bed5aa;border-color:#2f4722;box-shadow:none}
+.theme-dark :is(.settings-top,.settings-content,.provider-detail,.binding-card) :is(h1,h2,h3,h4,strong){color:#d0e5bc}
+.theme-dark :is(.settings-top,.settings-content,.provider-detail,.binding-card) :is(p,small,label){color:#99b67f}
+.theme-dark :is(.provider-option,.settings-nav button,.connect-methods button,.binding-card select,.settings-content input,.vault-panel,.catalog-preview,.settings-sidebar,.secret-preview,.provider-search){background:#15220f;color:#b5cf9c;border-color:#314d22}
+.theme-dark :is(.provider-option.active,.settings-nav button.active,.connect-methods button.active,.primary-action){background:#8fae72;color:#102006;border-color:#8fae72}
+.ophi-studio.theme-dark .provider-option.active :is(strong,small){color:#15270b!important}
+.theme-dark :is(.settings-banner,.settings-footnote,.demo-explainer,.eyebrow){color:#9cb686;border-color:#314824}
+.theme-dark .settings-sidebar button{color:#a2bd89}.theme-dark .settings-sidebar button.active{background:#293e1b;color:#c4dea9;border-color:#3d5c28}
+.theme-dark :is(.provider-logo,.binding-avatar,.binding-fixed,.settings-count){background:#253b17;color:#a7ca87;border-color:#395923}
+.theme-dark :is(.provider-doc-link,.outline-action,.settings-muted a){color:#abc987}
+.theme-dark .settings-content :is(select,button,input){border-color:#395326}
+.theme-dark :is(.vault-row button,.vault-actions button){background:#8fae72;color:#102006;border-color:#8fae72}
+.theme-dark :is(.vault-row button,.vault-actions button):disabled{background:#233519;color:#80966e;border-color:#344d24}
+.theme-dark .settings-top button{color:#b2cd94;border-color:#3d592a;background:transparent}
+.theme-dark :is(.v5-mode-cards button,.v5-segment,.v5-reset,.v5-switch-row,.v5-inspector-top button){background:#17260f;color:#abc98d;border-color:#344e24}
+.theme-dark :is(.v5-mode-cards button.selected,.v5-segment button.selected){background:#2b431b;color:#c8e2ad;border-color:#567a37}
+.theme-dark :is(.v5-mode-cards small,.v5-preferences-head p,.v5-pref-hint,.v5-inspector p,.v5-inspector small){color:#99b47f}
+.theme-dark :is(.v5-timeline-item,.v7-flow-summary,.runtime-artifacts,.ow-artifacts,.artifact-content){background:#14210d;color:#a9c88b;border-color:#304b20}
+.theme-dark .v5-chat-response p,.theme-dark .v5-chat-bubble p{color:#a7c587}
+.theme-dark .analytics-page{color:#adc993}
+.theme-dark :is(.analytics-head h2,.kpi-card strong,.dash-top h1){color:#c7dfa9}
+.theme-dark :is(.analytics-head p,.dash-top p,.kpi-card small,.kpi-card p,.model-label small,.chart-foot,.demo-explainer){color:#9cb97f}
+.theme-dark :is(.kpi-icon,.period-picker,.chart-switch,.dash-console,.dash-pagination button,.model-track,.health-grid>div){background:#1c2d10;color:#aacd83;border-color:#354f22}
+.theme-dark :is(.period-picker button.chosen,.chart-switch button.chosen){background:#a0bf7d;color:#122206;border-color:#a0bf7d}
+.theme-dark .analytics-page th{background:#1a2c0f;color:#afcf88;border-color:#385525}.theme-dark .analytics-page td{border-color:#2b431d;color:#a5c17e}
+.theme-dark .model-value,.theme-dark .model-label strong{color:#bedb97}
+.theme-dark .donut::after{background:#10190c}.theme-dark .donut strong{color:#bfd99b}
+@media(max-width:460px){.ophi-studio .v5-tabs button{font-size:0;gap:0}.ophi-studio .v5-tabs button svg{width:18px;height:18px}.ophi-studio .v5-topbar{gap:16px}}
+@media(prefers-reduced-motion:no-preference){.studio-theme-toggle{transition:background-color .15s,color .15s}}
