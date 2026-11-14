@@ -20,7 +20,7 @@ import {createAutopilotPolicy,driveAutopilot} from './autopilot.mjs';
 const PORT=Number(process.env.OPHIUCHUS_PORT||4317);
 const DB=resolve(process.env.OPHIUCHUS_STATE_FILE||'./.ophiuchus-local/runs.json');
 let runs={};
-let folderPickerBusy=false;
+let folderPickerBusy=false,folderPickerController=null;
 const projects=createProjectService({onUsage:async report=>{
  runs[report.id]={id:report.id,type:'project-task',projectId:report.projectId,prompt:'Tarefa de projeto local',createdAt:report.at,status:'DOCUMENTED',stage:'project.'+report.mode,configSnapshot:[],history:[],events:[],artifacts:[{id:report.id+':response',stage:'project.'+report.mode,providerId:report.binding.providerId,model:report.binding.modelId,usage:report.usage,at:report.at,text:'Uso do modelo em projeto local; relatório e rascunho na sessão do projeto.',integrity:'unverified'}]};await save();
 }});
@@ -50,10 +50,13 @@ const server=http.createServer(async(req,res)=>{
   if(origin && !/^http:\/\/(localhost|127\.0\.0\.1):(5173|4317)$/.test(origin))return json(res,403,{error:'Origem não autorizada'});
   const url=new URL(req.url,'http://localhost');
   if(req.method==='GET'&&url.pathname==='/projects/picker')return json(res,200,{supported:process.platform==='win32',platform:process.platform});
+  if(req.method==='POST'&&url.pathname==='/projects/picker/cancel'){folderPickerController?.abort();return json(res,200,{cancelled:true});}
   if(req.method==='POST'&&url.pathname==='/projects/pick'){
    const body=await readBody(req);if(body.confirmRead!==true)throw Error('A seleção deve autorizar leitura da pasta escolhida');
-   if(folderPickerBusy)return json(res,409,{error:'O seletor de pasta já está aberto'});folderPickerBusy=true;
-   try{const path=await pickNativeFolder();return path?json(res,201,await projects.open({path,confirmRead:true})):json(res,200,{cancelled:true});}finally{folderPickerBusy=false;}
+   if(folderPickerBusy)return json(res,409,{error:'O seletor de pasta já está aberto'});folderPickerBusy=true;folderPickerController=new AbortController();
+   try{const path=await pickNativeFolder({signal:folderPickerController.signal});return path?json(res,201,await projects.open({path,confirmRead:true})):json(res,200,{cancelled:true});}
+   catch(error){if(['PICKER_TIMEOUT','PICKER_UNAVAILABLE'].includes(error.code))return json(res,error.code==='PICKER_TIMEOUT'?408:503,{error:error.message,code:error.code});throw error;}
+   finally{folderPickerBusy=false;folderPickerController=null;}
   }
   if(req.method==='POST'&&url.pathname==='/projects/open')return json(res,201,await projects.open(await readBody(req)));
   const flowMatch=url.pathname.match(/^\/projects\/([0-9a-f-]+)\/flows(?:\/([0-9a-f-]+)(?:\/(cancel))?)?$/);

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
-import { Activity, BarChart3, Settings2, Zap, Square, ChevronDown, ChevronRight, Code2, ShieldCheck, FileText, BrainCircuit, Sparkles, CircleHelp, PanelRightOpen, Check, Clock3, ArrowUp, Workflow, Eye, RotateCcw, SlidersHorizontal, Cpu, ListTree, LayoutGrid, X, Terminal, MessageCircle, CircleDot, Search, Filter, Layers3, Gauge, Timer, GitBranch, ArrowRight, PanelLeftClose, FolderOpen, Bot, UserRound } from 'lucide-react'
+import { Activity, BarChart3, Settings2, Zap, Square, ChevronDown, ChevronRight, Code2, ShieldCheck, FileText, BrainCircuit, Sparkles, CircleHelp, PanelRightOpen, Check, Clock3, ArrowUp, Workflow, Eye, RotateCcw, SlidersHorizontal, Cpu, ListTree, LayoutGrid, X, Terminal, MessageCircle, CircleDot, Search, Filter, Layers3, Gauge, Timer, GitBranch, ArrowRight, PanelLeftClose, FolderOpen, Bot, UserRound, Moon, Sun } from 'lucide-react'
 import type { AgentDefinition, RunAgentState, RunEvent, RunSnapshot, TaskDefinition, AgentStatus } from './domain'
 import { createTasks, defaultAgents } from './mockOrchestrator'
 import { api, projectRun } from './runtimeClient'
@@ -16,6 +16,7 @@ import './workspace-v05.css'
 import './workspace-v06.css'
 import './workspace-v07.css'
 import './studio.css'
+import './studio-dark.css'
 
 type Mode = 'focus' | 'engineering'
 type Density = 'comfortable' | 'compact'
@@ -28,6 +29,8 @@ const help={agents:'Agentes são especialistas com funções e modelos independe
 function Tip({text}:{text:string}){return <span className="v5-tip" tabIndex={0} title={text} aria-label={text}><CircleHelp size={14}/></span>}
 function StatusIcon({status}:{status:AgentStatus}){return status==='SUCCESS'?<Check size={13}/>:status==='RUNNING'?<span className="v5-spinner"/>:status==='QUEUED'?<Clock3 size={13}/>:<CircleDot size={12}/>}
 export default function App(){
+ const [theme,setTheme]=useState<'light'|'dark'>(()=>{try{return localStorage.getItem('ophiuchus.theme')==='dark'?'dark':'light'}catch{return 'light'}})
+ useEffect(()=>{try{localStorage.setItem('ophiuchus.theme',theme)}catch{}document.documentElement.style.colorScheme=theme;},[theme])
  const [view,setView]=useState<'console'|'dashboard'|'settings'>(()=>new URLSearchParams(window.location.search).has('code')?'settings':'console')
  const [agents,setAgents]=useState<AgentDefinition[]>(defaultAgents)
  const [states,setStates]=useState<RunAgentState[]>(defaultAgents.map(a=>({agentId:a.id,status:'IDLE',currentTask:'Aguardando execução',lastEvent:'Sem atividade',progress:0})))
@@ -91,7 +94,7 @@ export default function App(){
  const updateBinding=(id:string,providerId:string,modelId:string)=>{const next=agents.map(a=>a.id===id?{...a,modelBinding:{...a.modelBinding,providerId,modelId,mode:'FIXED' as const}}:a);setAgents(next);const payload=Object.fromEntries(next.map(a=>[a.id,{providerId:a.modelBinding.providerId,modelId:a.modelBinding.modelId}]));void api('/bindings',payload,'PUT').catch(e=>setRuntimeError('Não foi possível salvar bindings: '+e.message));}
  const visibleTasks=prefs.mode==='focus'&&!showAllTasks?tasks.filter(t=>t.status==='RUNNING'||t.status==='SUCCESS').slice(-3):tasks
  const effectiveInspector=prefs.inspector&&(!!selectedTask||!!selectedAgent||prefs.mode==='engineering')
- return <div className={`ophi-studio ${projectStatus.active?'has-project':''} v5-app v5-${prefs.mode} v5-${prefs.density} ${prefs.motion?'':'v5-reduced'}`}>
+ return <div className={`ophi-studio theme-${theme} ${projectStatus.active?'has-project':''} v5-app v5-${prefs.mode} v5-${prefs.density} ${prefs.motion?'':'v5-reduced'}`}>
   <aside className="v5-dock" aria-label="Navegação"><div className="v5-logo" title="Ophiuchus"><span aria-label="Ophiuchus">O/</span></div>
    <button title="Console" aria-label="Console" className={view==='console'?'active':''} onClick={()=>setView('console')}><MessageCircle size={20}/></button>
    <button title="Dashboard" aria-label="Dashboard" className={view==='dashboard'?'active':''} onClick={()=>setView('dashboard')}><BarChart3 size={20}/></button>
@@ -102,6 +105,7 @@ export default function App(){
    <div className="v5-tabs"><button className={view==='console'?'active':''} onClick={()=>setView('console')}><MessageCircle size={15}/> Console</button><button className={view==='dashboard'?'active':''} onClick={()=>setView('dashboard')}><BarChart3 size={15}/> Dashboard</button><button className={view==='settings'?'active':''} onClick={()=>setView('settings')}><Settings2 size={15}/> Provedores</button></div>
    <div className="v5-live"><span className={`v5-led ${running?'pulse':''}`}/>{projectStatus.busy?'Trabalhando no projeto':projectStatus.active?projectStatus.name:running?'Execução em tempo real':finished?'Execução concluída':cancelled?'Execução cancelada':'Sistema pronto'}</div>
    <div className="v5-top-actions">{view==='console'&&<><button className="v5-mode-toggle" title={projectStatus.active?'A equipe do projeto é acompanhada no registro de execução do chat':'Configurar ciclo assistido'} disabled={projectStatus.active} onClick={()=>setShowAutopilot(true)}><Bot size={15}/> Ciclo assistido{runtimeRun?.autoPilot?.status==='RUNNING'?' · ativo':''}</button><button className="v5-mode-toggle" title={help.modes} onClick={()=>setPref('mode',prefs.mode==='focus'?'engineering':'focus')}><LayoutGrid size={15}/>{prefs.mode==='focus'?'Modo Foco':'Modo Engenharia'}</button><button className="v5-iconbtn" title={prefs.sidebar?'Ocultar arquivos':'Mostrar arquivos'} onClick={()=>setPref('sidebar',!prefs.sidebar)}><ListTree size={17}/></button></>}<button className="v5-iconbtn" title="Personalizar interface" onClick={()=>setShowPreferences(true)}><SlidersHorizontal size={17}/></button></div>
+   <button className="studio-theme-toggle" aria-label={theme==='dark'?'Ativar tema claro':'Ativar tema black'} title={theme==='dark'?'Tema claro':'Tema black'} onClick={()=>setTheme(t=>t==='dark'?'light':'dark')}>{theme==='dark'?<Sun size={17}/>:<Moon size={17}/>}</button>
   </header>
   {view==='dashboard'?<div className="v5-page"><Dashboard onGoConsole={()=>setView('console')}/></div>:view==='settings'?<div className="v5-page"><SettingsCenter agents={agents} onUpdate={updateBinding} onBack={()=>setView('console')}/></div>:<div ref={workspaceRef} style={{'--v6-agents':`${panelSizes.agents}px`,'--v6-inspector':`${panelSizes.inspector}px`} as React.CSSProperties} className={`v5-workspace v6-workspace ${!prefs.sidebar?'no-rail':''} ${effectiveInspector?'with-inspector':''} ${narrow?'v6-narrow':''}`}>
    {prefs.sidebar&&<aside className="v5-project-sidebar" ref={setProjectSidebarHost}/>}

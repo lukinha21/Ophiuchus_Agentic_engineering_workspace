@@ -16,6 +16,7 @@ test('local project HTTP grant, search, read, revocation and origin checks',asyn
  assert.equal((await request('/projects/open',{path:root,confirmRead:true},{origin:'https://untrusted.example'})).status,403);
  assert.equal((await request('/projects/open',{path:root,confirmRead:false})).status,400);
  assert.equal((await request('/projects/picker')).data.platform,process.platform);
+ assert.equal((await request('/projects/picker/cancel',{})).data.cancelled,true);
  assert.equal((await request('/projects/pick',{confirmRead:false})).status,400);
  if(process.platform!=='win32')assert.equal((await request('/projects/pick',{confirmRead:true})).status,400);
  const opened=await request('/projects/open',{path:root,confirmRead:true});assert.equal(opened.status,201);const id=opened.data.id;assert.deepEqual(opened.data.files.map(f=>f.path),['main.mjs']);
