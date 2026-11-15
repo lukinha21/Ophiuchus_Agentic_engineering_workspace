@@ -54,7 +54,7 @@ export async function generateText({providerId,model,messages,maxOutputTokens=60
  if(p.kind==='gemini'){
   const candidate=json.candidates?.[0];text=(candidate?.content?.parts||[]).filter(x=>typeof x.text==='string'&&!x.thought).map(x=>x.text).join('\n');
   finishReason=candidate?.finishReason==='MAX_TOKENS'?'length':candidate?.finishReason==='STOP'?'stop':candidate?.finishReason||null;
-  const u=json.usageMetadata||{};usage={prompt_tokens:u.promptTokenCount||0,completion_tokens:u.candidatesTokenCount||0,total_tokens:u.totalTokenCount||0};
+  const u=json.usageMetadata||{};usage={prompt_tokens:u.promptTokenCount||0,completion_tokens:u.candidatesTokenCount||0,total_tokens:u.totalTokenCount||0,thinking_tokens:u.thoughtsTokenCount||0,cached_input_tokens:u.cachedContentTokenCount||0};
  }else if(p.kind==='anthropic'){
   text=(json.content||[]).filter(x=>x.type==='text').map(x=>x.text).join('\n');finishReason=json.stop_reason==='max_tokens'?'length':json.stop_reason==='end_turn'?'stop':json.stop_reason||null;
   usage={prompt_tokens:json.usage?.input_tokens||0,completion_tokens:json.usage?.output_tokens||0,total_tokens:(json.usage?.input_tokens||0)+(json.usage?.output_tokens||0)};

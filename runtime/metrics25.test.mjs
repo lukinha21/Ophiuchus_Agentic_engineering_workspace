@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import {summarizeMetrics} from './metrics.mjs';
 import {sourceSnapshot,buildMessages} from './executor.mjs';
 import {compactHistory} from './optimization.mjs';
+
+test('workflow usage is grouped without losing processing tokens from provider totals',()=>{
+ const date=new Date().toISOString(),runs={};for(const stage of ['architect','developer'])runs[stage]={id:stage,workflowId:'flow-1',createdAt:date,type:'project-task',status:'DOCUMENTED',artifacts:[{providerId:'google',model:'gemini',usage:{prompt_tokens:100,completion_tokens:20,total_tokens:150}}]};
+ const m=summarizeMetrics(runs);assert.equal(m.total,300);assert.equal(m.other,60);assert.equal(m.runsDetail.length,1);assert.equal(m.runsDetail[0].calls,2);assert.equal(m.runsDetail[0].tokens,300);assert.equal(m.models[0].total,300);
+});
 test('metrics use persisted real usage only, group model and run',()=>{
  const now=Date.parse('2026-11-11T12:00:00Z');const r={a:{id:'a',createdAt:'2026-11-11T10:00:00Z',status:'SUCCESS',artifacts:[{stage:'implementation',providerId:'google',model:'gemini',at:'2026-11-11T10:05:00Z',usage:{prompt_tokens:100,completion_tokens:50,total_tokens:150}},{stage:'qa',providerId:'google',model:'gemini',at:'2026-11-11T10:06:00Z',usage:{prompt_tokens:20,completion_tokens:10,total_tokens:30}}],testResults:[{passed:true}]}};
  const m=summarizeMetrics(r,1,now);assert.equal(m.calls,2);assert.equal(m.input,120);assert.equal(m.output,60);assert.equal(m.models[0].stages.implementation,150);assert.equal(m.testsPassed,1);

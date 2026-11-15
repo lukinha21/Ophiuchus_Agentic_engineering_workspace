@@ -22,7 +22,7 @@ const DB=resolve(process.env.OPHIUCHUS_STATE_FILE||'./.ophiuchus-local/runs.json
 let runs={};
 let folderPickerBusy=false,folderPickerController=null;
 const projects=createProjectService({onUsage:async report=>{
- runs[report.id]={id:report.id,type:'project-task',projectId:report.projectId,prompt:'Tarefa de projeto local',createdAt:report.at,status:'DOCUMENTED',stage:'project.'+report.mode,configSnapshot:[],history:[],events:[],artifacts:[{id:report.id+':response',stage:'project.'+report.mode,providerId:report.binding.providerId,model:report.binding.modelId,usage:report.usage,at:report.at,text:'Uso do modelo em projeto local; relatório e rascunho na sessão do projeto.',integrity:'unverified'}]};await save();
+ runs[report.id]={id:report.id,type:'project-task',workflowId:report.workflowId||null,projectId:report.projectId,prompt:'Tarefa de projeto local',createdAt:report.at,status:'DOCUMENTED',stage:'project.'+report.mode,configSnapshot:[],history:[],events:[],artifacts:[{id:report.id+':response',stage:'project.'+report.mode,providerId:report.binding.providerId,model:report.binding.modelId,usage:report.usage,at:report.at,text:'Uso do modelo em projeto local; relatório e rascunho na sessão do projeto.',integrity:'unverified'}]};await save();
 }});
 const executing=new Set();
 const testing=new Set();
