@@ -38,4 +38,6 @@
 .ophi-studio :is(.v5-live,.v5-wordmark small,.v5-composer-bottom,.model-label small,.trend-axis,.donut-legend,.health-grid small){font-size:calc(12px * var(--reading))!important;color:var(--studio-muted)!important}
 .ophi-brand-symbol{background:none!important;box-shadow:none!important;padding:0!important;border:0!important;color:inherit!important;border-radius:0!important}
 .ophi-studio .flow-stations{gap:12px;overflow-x:auto}.ophi-studio .flow-stations button{min-width:100px}.ophi-studio .flow-ledger footer{flex-wrap:wrap;gap:8px}.ophi-studio .project-test-unavailable{color:var(--studio-muted)}
+.ophi-studio .project-console-permission{background:var(--studio-surface);border-color:var(--studio-rule)}
+.project-task-modes label{display:grid;gap:8px;flex:1 1 240px;min-width:0;max-width:100%}.project-task-modes select{width:100%;min-width:0;max-width:100%;text-overflow:ellipsis}
 @media(max-width:600px){.theme-picker{grid-template-columns:1fr}.ophi-studio .v5-tabs button{font-size:0!important}.ophi-studio .v5-center{padding-left:16px;padding-right:16px}}

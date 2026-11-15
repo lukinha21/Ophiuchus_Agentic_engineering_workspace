@@ -10,7 +10,7 @@ function changedDiff(before,after){
 // Review keeps complete originals and proposals. Other roles receive only their dependencies.
 export function stageContext(role,{original,draft,stages,history,goal}){
  const dependencies={orchestrator:[],architect:['orchestrator'],reviewer:['orchestrator','architect','developer'],qa:['orchestrator','developer'],documentation:['developer','reviewer','qa']};
- const artifacts=stages.filter(s=>s.status==='COMPLETED'&&dependencies[role]?.includes(s.id)).map(s=>({role:s.id,text:s.text.slice(0,role==='documentation'?1200:1600)}));
+ const artifacts=stages.filter(s=>s.status==='COMPLETED'&&dependencies[role]?.includes(s.id)).map(s=>({role:s.id,...(s.handoff?{result:s.handoff}:{text:s.text.slice(0,role==='documentation'?1200:1600)})}));
  let files=original,contextKind='COMPLETE_SELECTED_FILES';
  if(role==='orchestrator'){
   files=original.map(f=>({path:f.path,sha256:f.sha256,chars:f.content.length,overview:f.content.length>2600?f.content.slice(0,1200)+'\n[... trecho intermediário omitido; arquitetura recebe o arquivo completo ...]\n'+f.content.slice(-1400):f.content,overviewPartial:f.content.length>2600}));contextKind='FILE_OVERVIEWS';
