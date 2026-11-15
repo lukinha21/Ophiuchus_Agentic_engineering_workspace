@@ -88,6 +88,20 @@ test('policy snapshots inherit common settings and preserve per-agent model bind
  const f=await fixture(t);const policy={format:'auto',cache:'explicit',agents:{qa:{format:'prompt'}}};const id=(await f.start({policy})).id;policy.agents.qa.format='auto';const flow=await done(f,id);assert.equal(flow.status,'READY');assert.equal(flow.policy.agents.qa.format,'prompt');assert.equal(f.calls.find(c=>c.model==='qa').policy.cache,'explicit');assert.equal(f.calls.find(c=>c.model==='qa').policy.format,'prompt');assert.equal(flow.bindings.qa.modelId,'qa');assert.equal(flow.events.filter(e=>e.type==='handoff.validated').length,6);
 });
 
+test('saved pre-proposal checkpoint resumes the same flow with authorized pending-model changes',async t=>{
+ const f=await fixture(t,async a=>{if(a.model==='architect')throw Error('HTTP 429 quota');return answer(a.model)});const id=(await f.start()).id,first=await done(f,id);assert.equal(first.calls,2);
+ const calls=[];const service=createProjectService({storageRoot:join(f.root,'..','store'),generate:async a=>{calls.push(a);return answer(a.model.replace(/^new-/,''))}});const project=await service.open({path:f.root,confirmRead:true});const next=Object.fromEntries(PROJECT_STAGES.map(s=>[s.id,{providerId:'google',modelId:'new-'+s.id}]));
+ await assert.rejects(service.resumeFlow(project.id,id,{savedProjectId:f.project.id,confirmSend:true,bindings:next}),/Autorize a troca/);assert.equal(calls.length,0);
+ await service.resumeFlow(project.id,id,{savedProjectId:f.project.id,confirmSend:true,confirmModelChange:true,bindings:next});const flow=await done({service,project},id);
+ assert.equal(flow.status,'READY');assert.equal(flow.id,id);assert.equal(flow.calls,7);assert.equal(calls.length,5);assert.equal(flow.bindings.orchestrator.modelId,'orchestrator');assert.equal(flow.bindings.architect.modelId,'new-architect');assert.equal(flow.bindingHistory[0].changes.length,5);assert.ok(flow.events.some(e=>e.type==='flow.restored'));assert.ok(flow.events.some(e=>e.type==='bindings.changed'));
+});
+
+test('restoring a checkpoint rejects changed sources and another project root before model dispatch',async t=>{
+ const f=await fixture(t,async()=>{throw Error('HTTP 429 quota')});const id=(await f.start()).id;await done(f,id);let calls=0;const service=createProjectService({storageRoot:join(f.root,'..','store'),generate:async()=>{calls++;throw Error('must not call')}});
+ const other=await fixture(t),wrong=await service.open({path:other.root,confirmRead:true});await assert.rejects(service.resumeFlow(wrong.id,id,{savedProjectId:f.project.id,confirmSend:true}),/outra pasta/);
+ await writeFile(join(f.root,'sum.mjs'),'manual edit');const changed=await service.open({path:f.root,confirmRead:true});await assert.rejects(service.resumeFlow(changed.id,id,{savedProjectId:f.project.id,confirmSend:true}),/Conflito/);assert.equal(calls,0);
+});
+
 test('truncated architect can resume once with a larger bounded output without repeating the plan',async t=>{
  let attempts=0;const f=await fixture(t,async a=>a.model==='architect'&&++attempts===1?{text:'partial',finishReason:'length',usage:{total_tokens:4096}}:answer(a.model));
  const id=(await f.start()).id,first=await done(f,id);

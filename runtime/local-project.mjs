@@ -189,6 +189,21 @@ export function createProjectService({storageRoot=process.env.OPHIUCHUS_PROJECTS
   release:async(id,workflowId)=>{const p=grants.get(id);if(p?.workflowId===workflowId)p.workflowId=null;},
   persist:async(id,flow)=>{const p=await grant(id),dir=join(p.dir,'flows'),snapshot=JSON.stringify(flow,null,2);const pending=(flowWrites.get(flow.id)||Promise.resolve()).catch(()=>{}).then(async()=>{await mkdir(dir,{recursive:true,mode:0o700});const temp=join(dir,flow.id+'.'+randomUUID()+'.tmp');try{await writeFile(temp,snapshot,{mode:0o600});await rename(temp,join(dir,flow.id+'.json'));}finally{await unlink(temp).catch(()=>{});}});flowWrites.set(flow.id,pending);try{await pending;}finally{if(flowWrites.get(flow.id)===pending)flowWrites.delete(flow.id);}}
  });
+ async function resumeFlow(id,flowId,request){
+  const p=await grant(id);
+  if(request.savedProjectId){
+   if(!/^[0-9a-f-]{36}$/.test(request.savedProjectId)||!/^[0-9a-f-]{36}$/.test(flowId))throw Error('Checkpoint inválido');
+   const savedDir=resolve(storageRoot,request.savedProjectId),session=JSON.parse(await readFile(join(savedDir,'session.json'),'utf8'));
+   if(session.root!==p.root)throw Error('Checkpoint pertence a outra pasta');
+   const snapshot=JSON.parse(await readFile(join(savedDir,'flows',flowId+'.json'),'utf8'));if(snapshot.id!==flowId||snapshot.projectId!==request.savedProjectId)throw Error('Checkpoint inválido');
+   const payloads=snapshot.stages.flatMap(s=>(s.request?.messages||[]).filter(m=>m.role==='user').map(m=>{try{return JSON.parse(m.content)}catch{return null}})).filter(Boolean);
+   const hashes=new Map(payloads.flatMap(payload=>payload.files||[]).filter(f=>f.sha256).map(f=>[f.path,f.sha256]));
+   const files=[];for(const path of snapshot.contextPaths){const f=await read(id,path);if(!hashes.has(path)||hashes.get(path)!==f.sha256)throw Error('Conflito: arquivo mudou desde o checkpoint');files.push(f);}
+   const history=payloads.find(payload=>Array.isArray(payload.history))?.history||[];
+   await workflows.restore(id,snapshot,{files,history});
+  }
+  return workflows.resume(id,flowId,request);
+ }
  return {open:openProject,info,list,read,search,task,draft:getDraft,apply,undo,test:testDraft,close,
-  startFlow:workflows.start,resumeFlow:async(id,flowId,request)=>{await grant(id);return workflows.resume(id,flowId,request)},flowDetails:async(id,flowId,stageId)=>{await grant(id);return workflows.details(id,flowId,stageId)},flow:async(id,flowId)=>{await grant(id);return workflows.get(id,flowId)},flows:async id=>{await grant(id);return workflows.list(id)},cancelFlow:async(id,flowId)=>{await grant(id);return workflows.cancel(id,flowId)}};
+  startFlow:workflows.start,resumeFlow,flowDetails:async(id,flowId,stageId)=>{await grant(id);return workflows.details(id,flowId,stageId)},flow:async(id,flowId)=>{await grant(id);return workflows.get(id,flowId)},flows:async id=>{await grant(id);return workflows.list(id)},cancelFlow:async(id,flowId)=>{await grant(id);return workflows.cancel(id,flowId)}};
 }

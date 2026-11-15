@@ -30,3 +30,9 @@ The project UI offers format/cache selection. The inspector records contract and
 Compare the same goal, source snapshot, history, bindings and completed stages. Record prompt, output, provider total, cache reads/writes, attempts and finish status. A single before/after sample is observational: stochastic output and reasoning differ. Monetary cost requires the user's actual billing tier and applicable rates; token totals alone cannot establish a dollar amount.
 
 No LLMLingua, Instructor, LiteLLM or RouteLLM service is required. Learned compression and automatic model routing remain separate opt-in experiments requiring quality evaluations. The current routing policy is the explicit per-agent binding.
+
+## Authorized model changes on resume
+
+Resume preserves completed stages and their original bindings. Rebinding unfinished stages requires `confirmModelChange: true` and a new `bindings` map; an audit event records each old/new pair. The UI exposes this as an unchecked option. Model selection is never silently refreshed from global settings.
+
+For a server restart, failed checkpoints **before proposal creation only** can be restored by opening the same root and supplying `savedProjectId` to the resume endpoint. The runtime loads its own saved flow, verifies the saved session root and every source hash, and preserves the flow ID, call budget, active deadline and retry counter. Checkpoints with drafts, changed sources or an exhausted retry budget are rejected. This is not a general restart recovery mechanism for applied drafts.

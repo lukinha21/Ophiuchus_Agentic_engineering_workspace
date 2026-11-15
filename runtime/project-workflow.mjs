@@ -120,16 +120,26 @@ export function createProjectWorkflows({reserve,release,persist,generate,impleme
   const f=find(projectId,id);if(!settled.has(id)||!f.canResume||f.status!=='FAILED')throw Error('Este fluxo não pode ser retomado');
   if(request.confirmSend!==true)throw Error('Autorize a nova chamada para retomar');
   const timeoutMs=request.timeoutMs??stageTimeoutMs;if(![stageTimeoutMs,180000].includes(timeoutMs))throw Error('Prazo de retomada inválido');
-  if(f.activeMs>=totalTimeoutMs)throw Error('Prazo total atingido');await checkBindings(f.bindings);
+  if(f.activeMs>=totalTimeoutMs)throw Error('Prazo total atingido');
+  const next=structuredClone(f.bindings),changes=[];
+  if(request.bindings){if(request.confirmModelChange!==true)throw Error('Autorize a troca dos modelos pendentes');for(const stage of f.stages.filter(s=>s.status!=='COMPLETED')){const b=request.bindings[stage.id];if(!b||typeof b.providerId!=='string'||!b.providerId.trim()||b.providerId==='mock'||typeof b.modelId!=='string'||!b.modelId.trim()||b.modelId.length>180)throw Error('Configure um modelo real para '+stage.name);if(b.providerId!==next[stage.id].providerId||b.modelId!==next[stage.id].modelId)changes.push({role:stage.id,from:next[stage.id],to:{providerId:b.providerId,modelId:b.modelId}});next[stage.id]={providerId:b.providerId,modelId:b.modelId};}}
+  await checkBindings(Object.fromEntries(f.stages.filter(s=>s.status!=='COMPLETED').map(s=>[s.id,next[s.id]])));
   const initial=contexts.get(id);if(!initial)throw Error('Contexto da sessão não está disponível');
   const fresh=await reserve(projectId,id,{goal:f.goal,paths:f.contextPaths,history:initial.history});
   if(initial.files.some(x=>fresh.files.find(y=>y.path===x.path)?.sha256!==x.sha256)){await release(projectId,id);throw Error('Conflito: arquivos mudaram; faça um novo pedido');}
+  if(changes.length){f.bindings=next;f.bindingHistory=f.bindingHistory||[];f.bindingHistory.push({at:new Date().toISOString(),changes});event(f,'bindings.changed','Troca autorizada dos modelos das etapas pendentes',{changes});}
   const controller=new AbortController();controllers.set(id,controller);settled.delete(id);f.retries++;f.status='RUNNING';f.canResume=false;f.error=null;f.errorInfo=null;
   event(f,'flow.resumed','Retomada autorizada na etapa '+f.stage,{timeoutMs});
   try{await save(f);}catch(e){await release(projectId,id);controllers.delete(id);settled.add(id);f.status='FAILED';throw e;}
   void drive(f,initial,controller,f.stages.findIndex(s=>s.id===f.stage),timeoutMs).catch(()=>{});return publicFlow(f);
  }
+ async function restore(projectId,snapshot,context){
+  if(flows.has(snapshot.id))return publicFlow(find(projectId,snapshot.id));
+  if(snapshot.status!=='FAILED'||!snapshot.canResume||snapshot.draftId||snapshot.maxCalls!==7||!Number.isInteger(snapshot.calls)||snapshot.calls<1||snapshot.calls>=7||snapshot.retries!==0||!Array.isArray(snapshot.stages)||snapshot.stages.length!==6||snapshot.stages.some((s,i)=>s.id!==PROJECT_STAGES[i].id)||!context.files.length)throw Error('Checkpoint não pode ser restaurado; somente falhas anteriores à proposta e sem retomada prévia');
+  const f=structuredClone(snapshot);f.originProjectId=f.originProjectId||f.projectId;f.projectId=projectId;f.policy=normalizePolicy(f.policy);flows.set(f.id,f);contexts.set(f.id,context);settled.add(f.id);event(f,'flow.restored','Checkpoint anterior à proposta restaurado com hashes verificados');
+  try{await save(f);}catch(e){flows.delete(f.id);contexts.delete(f.id);settled.delete(f.id);throw e;}return publicFlow(f);
+ }
  async function cancel(projectId,id){const f=find(projectId,id);if(f.status==='RUNNING'){controllers.get(id)?.abort();f.status='CANCELLING';event(f,'flow.cancelling','Cancelamento solicitado; aguardando encerramento da chamada');await save(f);}return publicFlow(f);}
  function details(projectId,id,stageId){const f=find(projectId,id),stage=f.stages.find(s=>s.id===stageId);if(!stage)throw Error('Etapa não encontrada');return structuredClone({flowId:f.id,stage,events:f.events.filter(e=>e.stage===stageId)});}
- return {start,resume,details,get:(projectId,id)=>publicFlow(find(projectId,id)),cancel,list:projectId=>[...flows.values()].filter(f=>f.projectId===projectId).map(publicFlow)};
+ return {start,resume,restore,details,get:(projectId,id)=>publicFlow(find(projectId,id)),cancel,list:projectId=>[...flows.values()].filter(f=>f.projectId===projectId).map(publicFlow)};
 }
