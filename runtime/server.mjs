@@ -59,11 +59,14 @@ const server=http.createServer(async(req,res)=>{
    finally{folderPickerBusy=false;folderPickerController=null;}
   }
   if(req.method==='POST'&&url.pathname==='/projects/open')return json(res,201,await projects.open(await readBody(req)));
-  const flowMatch=url.pathname.match(/^\/projects\/([0-9a-f-]+)\/flows(?:\/([0-9a-f-]+)(?:\/(cancel))?)?$/);
+  const stageMatch=url.pathname.match(/^\/projects\/([0-9a-f-]+)\/flows\/([0-9a-f-]+)\/stages\/([a-z]+)$/);
+  if(stageMatch&&req.method==='GET')return json(res,200,await projects.flowDetails(stageMatch[1],stageMatch[2],stageMatch[3]));
+  const flowMatch=url.pathname.match(/^\/projects\/([0-9a-f-]+)\/flows(?:\/([0-9a-f-]+)(?:\/(cancel|resume))?)?$/);
   if(flowMatch){
    const [,id,flowId,action]=flowMatch;
    if(req.method==='POST'&&!flowId)return json(res,202,await projects.startFlow(id,await readBody(req)));
    if(req.method==='GET'&&!action)return json(res,200,flowId?await projects.flow(id,flowId):await projects.flows(id));
+   if(req.method==='POST'&&action==='resume')return json(res,202,await projects.resumeFlow(id,flowId,await readBody(req)));
    if(req.method==='POST'&&action==='cancel')return json(res,200,await projects.cancelFlow(id,flowId));
    return json(res,405,{error:'Ação do fluxo não permitida'});
   }
