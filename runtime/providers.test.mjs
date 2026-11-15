@@ -9,3 +9,8 @@ test('empty truncated responses retain finish reason and usage for bounded recov
  const result=await generateText({providerId:'openai',model:'demo',allowEmptyTruncated:true,messages:[{role:'user',content:'oi'}]},{env:{OPENAI_API_KEY:'test'},fetchImpl:async()=>({ok:true,json:async()=>({choices:[{message:{content:''},finish_reason:'length'}],usage:{total_tokens:4096}})})});
  assert.equal(result.text,'');assert.equal(result.finishReason,'length');assert.equal(result.usage.total_tokens,4096);
 });
+
+test('larger stage output is transmitted and remains hard bounded',async()=>{
+ let body;const options={env:{GEMINI_API_KEY:'test'},fetchImpl:async(url,o)=>{body=JSON.parse(o.body);return {ok:true,json:async()=>({candidates:[{content:{parts:[{text:'ok'}]},finishReason:'STOP'}]})}}};
+ const args={providerId:'google',model:'gemini-test',messages:[{role:'user',content:'oi'}],maxOutputTokens:8192};await generateText(args,options);assert.equal(body.generationConfig.maxOutputTokens,8192);await assert.rejects(generateText({...args,maxOutputTokens:8193},options),/Limite/);
+});

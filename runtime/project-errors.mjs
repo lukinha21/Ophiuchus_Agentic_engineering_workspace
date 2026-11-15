@@ -1,6 +1,7 @@
 /** User-facing diagnostics describe observed transport state, never an invented cause. */
 export function projectError(error,{stage='Agente',timeoutMs=90000,cancelled=false}={}){
  const raw=String(error?.message||error||'Falha desconhecida');
+ if(error?.code==='MODEL_OUTPUT_LIMIT')return {code:'MODEL_OUTPUT_LIMIT',message:`${stage} atingiu o limite de saída antes de concluir. Nenhuma alteração aplicada. Retome para refazer esta etapa com um limite maior.`,retryable:true,technical:raw};
  if(cancelled)return {code:'CANCELLED',message:'Execução cancelada. Nenhuma alteração aplicada.',retryable:false,technical:raw};
  if(error?.name==='TimeoutError'||/aborted due to timeout|timed? ?out/i.test(raw))return {code:'MODEL_TIMEOUT',message:`${stage} excedeu ${Math.round(timeoutMs/1000)} segundos sem uma resposta completa. Nenhuma alteração aplicada. É possível retomar esta etapa sem repetir as concluídas.`,retryable:true,technical:raw};
  if(/não configurado|desbloqueie.*cofre/i.test(raw))return {code:'PROVIDER_NOT_CONFIGURED',message:'O provedor não está disponível. Configure a chave ou desbloqueie o cofre antes de executar.',retryable:true,technical:raw};
