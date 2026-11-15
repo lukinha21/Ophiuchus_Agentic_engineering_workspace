@@ -8,6 +8,7 @@ import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
 import {resolve,dirname} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {createRun,startRun,completeStage,approve,reportFailure,cancel} from './orchestrator.mjs';
+import {capabilities} from './model-capabilities.mjs';
 import {listProviders,listModels} from './providers.mjs';
 import {vaultStatus,unlockVault,lockVault,saveCredential,removeCredential,saveCustomEndpoint} from './vault.mjs';
 import {executeStage} from './executor.mjs';
@@ -20,9 +21,9 @@ import {createAutopilotPolicy,driveAutopilot} from './autopilot.mjs';
 const PORT=Number(process.env.OPHIUCHUS_PORT||4317);
 const DB=resolve(process.env.OPHIUCHUS_STATE_FILE||'./.ophiuchus-local/runs.json');
 let runs={};
-let folderPickerBusy=false;
+let folderPickerBusy=false,folderPickerController=null;
 const projects=createProjectService({onUsage:async report=>{
- runs[report.id]={id:report.id,type:'project-task',projectId:report.projectId,prompt:'Tarefa de projeto local',createdAt:report.at,status:'DOCUMENTED',stage:'project.'+report.mode,configSnapshot:[],history:[],events:[],artifacts:[{id:report.id+':response',stage:'project.'+report.mode,providerId:report.binding.providerId,model:report.binding.modelId,usage:report.usage,at:report.at,text:'Uso do modelo em projeto local; relatório e rascunho na sessão do projeto.',integrity:'unverified'}]};await save();
+ runs[report.id]={id:report.id,type:'project-task',workflowId:report.workflowId||null,projectId:report.projectId,prompt:'Tarefa de projeto local',createdAt:report.at,status:'DOCUMENTED',stage:'project.'+report.mode,configSnapshot:[],history:[],events:[],artifacts:[{id:report.id+':response',stage:'project.'+report.mode,providerId:report.binding.providerId,model:report.binding.modelId,usage:report.usage,at:report.at,text:'Uso do modelo em projeto local; relatório e rascunho na sessão do projeto.',integrity:'unverified'}]};await save();
 }});
 const executing=new Set();
 const testing=new Set();
@@ -42,25 +43,33 @@ let saving=Promise.resolve();
 const save=()=>{const snapshot=JSON.stringify(runs,null,2);const pending=saving.catch(()=>{}).then(async()=>{await mkdir(dirname(DB),{recursive:true});const temporary=DB+'.'+randomUUID()+'.tmp';await writeFile(temporary,snapshot,{mode:0o600});await rename(temporary,DB);});saving=pending;return pending;};
 const json=(res,code,value)=>{res.writeHead(code,{'content-type':'application/json; charset=utf-8','cache-control':'no-store'});res.end(JSON.stringify(value));};
 const readBody=async(req)=>{let text='';for await(const chunk of req){text+=chunk;if(text.length>1024*1024)throw Error('Payload grande demais');}return JSON.parse(text||'{}');};
-const server=http.createServer(async(req,res)=>{
+export const server=http.createServer(async(req,res)=>{
  try{
   // Reject cross-site browser requests, including local-network origins.
   if(!/^(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(req.headers.host||''))return json(res,403,{error:'Host local obrigatório'});
   const origin=req.headers.origin;
   if(origin && !/^http:\/\/(localhost|127\.0\.0\.1):(5173|4317)$/.test(origin))return json(res,403,{error:'Origem não autorizada'});
   const url=new URL(req.url,'http://localhost');
+  if(req.method==='GET'&&url.pathname==='/health')return json(res,200,{ok:true,app:'ophiuchus'});
+  if(req.method==='GET'&&url.pathname==='/desktop/status'&&process.env.OPHIUCHUS_DESKTOP==='1')return json(res,200,{active:projects.activeCount()+executing.size+testing.size+autopiloting.size,blocking:projects.blockingCount()+executing.size+testing.size+autopiloting.size});
   if(req.method==='GET'&&url.pathname==='/projects/picker')return json(res,200,{supported:process.platform==='win32',platform:process.platform});
+  if(req.method==='POST'&&url.pathname==='/projects/picker/cancel'){folderPickerController?.abort();return json(res,200,{cancelled:true});}
   if(req.method==='POST'&&url.pathname==='/projects/pick'){
    const body=await readBody(req);if(body.confirmRead!==true)throw Error('A seleção deve autorizar leitura da pasta escolhida');
-   if(folderPickerBusy)return json(res,409,{error:'O seletor de pasta já está aberto'});folderPickerBusy=true;
-   try{const path=await pickNativeFolder();return path?json(res,201,await projects.open({path,confirmRead:true})):json(res,200,{cancelled:true});}finally{folderPickerBusy=false;}
+   if(folderPickerBusy)return json(res,409,{error:'O seletor de pasta já está aberto'});folderPickerBusy=true;folderPickerController=new AbortController();
+   try{const path=await pickNativeFolder({signal:folderPickerController.signal});return path?json(res,201,await projects.open({path,confirmRead:true})):json(res,200,{cancelled:true});}
+   catch(error){if(['PICKER_TIMEOUT','PICKER_UNAVAILABLE'].includes(error.code))return json(res,error.code==='PICKER_TIMEOUT'?408:503,{error:error.message,code:error.code});throw error;}
+   finally{folderPickerBusy=false;folderPickerController=null;}
   }
   if(req.method==='POST'&&url.pathname==='/projects/open')return json(res,201,await projects.open(await readBody(req)));
-  const flowMatch=url.pathname.match(/^\/projects\/([0-9a-f-]+)\/flows(?:\/([0-9a-f-]+)(?:\/(cancel))?)?$/);
+  const stageMatch=url.pathname.match(/^\/projects\/([0-9a-f-]+)\/flows\/([0-9a-f-]+)\/stages\/([a-z]+)$/);
+  if(stageMatch&&req.method==='GET')return json(res,200,await projects.flowDetails(stageMatch[1],stageMatch[2],stageMatch[3]));
+  const flowMatch=url.pathname.match(/^\/projects\/([0-9a-f-]+)\/flows(?:\/([0-9a-f-]+)(?:\/(cancel|resume))?)?$/);
   if(flowMatch){
    const [,id,flowId,action]=flowMatch;
    if(req.method==='POST'&&!flowId)return json(res,202,await projects.startFlow(id,await readBody(req)));
    if(req.method==='GET'&&!action)return json(res,200,flowId?await projects.flow(id,flowId):await projects.flows(id));
+   if(req.method==='POST'&&action==='resume')return json(res,202,await projects.resumeFlow(id,flowId,await readBody(req)));
    if(req.method==='POST'&&action==='cancel')return json(res,200,await projects.cancelFlow(id,flowId));
    return json(res,405,{error:'Ação do fluxo não permitida'});
   }
@@ -80,6 +89,7 @@ const server=http.createServer(async(req,res)=>{
    return json(res,405,{error:'Ação do projeto não permitida'});
   }
   if(req.method==='GET'&&url.pathname==='/health')return json(res,200,{ok:true,service:'ophiuchus-control-plane',providerExecution:true});
+  if(req.method==='GET'&&url.pathname==='/capabilities')return json(res,200,capabilities(url.searchParams.get('provider'),url.searchParams.get('model')||''));
   if(req.method==='GET'&&url.pathname==='/providers')return json(res,200,listProviders());
   if(req.method==='GET'&&url.pathname==='/vault')return json(res,200,await vaultStatus());
   if(req.method==='POST'&&url.pathname==='/vault/unlock'){const body=await readBody(req);return json(res,200,await unlockVault(body.password));}
@@ -211,3 +221,5 @@ const server=http.createServer(async(req,res)=>{
  }catch(error){json(res,400,{error:error.message});}
 });
 server.listen(PORT,'127.0.0.1',()=>console.log(`Ophiuchus control-plane: http://127.0.0.1:${PORT}`));
+
+export async function shutdown(){folderPickerController?.abort();await projects.cancelAll();lockVault();await saving.catch(()=>{});await new Promise(resolve=>server.close(resolve));}

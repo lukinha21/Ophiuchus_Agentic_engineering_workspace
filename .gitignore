@@ -5,3 +5,10 @@ node_modules
 
 .ophiuchus-local/
 .studio-preview/
+
+/desktop-build/
+/desktop-stage/
+/desktop/icon.png
+/desktop/icon.ico
+/desktop-app/
+/desktop-shortcut-backups/

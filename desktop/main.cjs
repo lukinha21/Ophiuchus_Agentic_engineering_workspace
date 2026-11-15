@@ -1,0 +1,28 @@
+const {app,BrowserWindow,dialog,shell}=require('electron');const {spawn}=require('node:child_process');const path=require('node:path');const fs=require('node:fs/promises');
+app.setName('Ophiuchus');app.setAppUserModelId('com.ophiuchus.desktop');app.commandLine.appendSwitch('force-renderer-accessibility');
+const argument=name=>process.argv.find(v=>v.startsWith('--'+name+'='))?.slice(name.length+3);
+const profile=argument('profile-dir');if(profile&&path.isAbsolute(profile))app.setPath('userData',profile);
+const locked=app.requestSingleInstanceLock();if(!locked)app.quit();
+let window,worker,origin='',quitting=false,closing=false;const appRoot=app.getAppPath();
+const externalHosts=new Set(['accounts.google.com','openrouter.ai','aistudio.google.com','platform.openai.com','console.anthropic.com','github.com','ai.dev','www.docker.com','docs.docker.com']);
+function external(url){try{const u=new URL(url);if(u.protocol==='https:'&&!u.username&&!u.password&&externalHosts.has(u.hostname)){void shell.openExternal(u.href);return true}}catch{}return false}
+app.on('second-instance',()=>{if(window){if(window.isMinimized())window.restore();window.show();window.focus()}});
+async function migrate(state){await fs.mkdir(state,{recursive:true});const source=argument('import-data-dir');if(!source||!path.isAbsolute(source)||await exists(path.join(state,'migration.json')))return;
+ for(const name of ['credentials.enc','bindings.json','options.json','runs.json','projects','workspaces']){const from=path.join(source,name),to=path.join(state,name);if(await exists(from)&&!await exists(to))await fs.cp(from,to,{recursive:true,errorOnExist:true,force:false});}
+ await fs.writeFile(path.join(state,'migration.json'),JSON.stringify({version:1,at:new Date().toISOString(),source},null,2));}
+async function exists(file){try{await fs.stat(file);return true}catch{return false}}
+async function startWorker(state){
+ const log=await fs.open(path.join(app.getPath('userData'),'desktop.log'),'a');
+ worker=spawn(process.execPath,[path.join(appRoot,'runtime','desktop-server.mjs')],{cwd:app.getPath('userData'),windowsHide:true,env:{...process.env,ELECTRON_RUN_AS_NODE:'1',OPHIUCHUS_STATE_FILE:path.join(state,'runs.json'),OPHIUCHUS_BINDINGS_FILE:path.join(state,'bindings.json'),OPHIUCHUS_OPTIONS_FILE:path.join(state,'options.json'),OPHIUCHUS_PROJECTS_DIR:path.join(state,'projects'),OPHIUCHUS_WORKSPACES_DIR:path.join(state,'workspaces'),OPHIUCHUS_VAULT_FILE:path.join(state,'credentials.enc')},stdio:['ignore',log.fd,log.fd,'ipc']});await log.close();
+ worker.on('message',message=>{if(message?.type==='oauth-callback'&&origin){try{const u=new URL(message.url);if(u.origin===origin&&u.pathname==='/'&&u.searchParams.has('code')&&u.href.length<12000)void window.loadURL(u.href)}catch{}}});
+ return new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('O backend não iniciou em 20 segundos')),20000);worker.once('error',e=>{clearTimeout(timer);reject(e)});worker.on('message',message=>{if(message?.type==='ready'){clearTimeout(timer);resolve(message.origin)}});worker.once('exit',code=>{clearTimeout(timer);if(!origin)reject(Error('O backend encerrou durante a inicialização ('+code+')'));else if(!quitting){dialog.showErrorBox('Ophiuchus','O serviço local encerrou. Reabra o aplicativo. O diagnóstico está em '+app.getPath('userData'));app.quit()}})});
+}
+async function stopWorker(){if(!worker||worker.exitCode!==null)return;worker.send({type:'shutdown'});await Promise.race([new Promise(resolve=>worker.once('exit',resolve)),new Promise(resolve=>setTimeout(resolve,3500))]);if(worker.exitCode===null)worker.kill();}
+if(locked)app.whenReady().then(async()=>{try{
+ const state=path.join(app.getPath('userData'),'state');await migrate(state);
+ window=new BrowserWindow({title:'Ophiuchus',width:1380,height:900,minWidth:900,minHeight:640,backgroundColor:'#15171c',icon:path.join(appRoot,'desktop','icon.png'),show:false,autoHideMenuBar:true,webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true}});window.setMenu(null);
+ window.webContents.session.setPermissionRequestHandler((_contents,_permission,callback)=>callback(false));window.webContents.setWindowOpenHandler(({url})=>{external(url);return {action:'deny'}});window.webContents.on('will-attach-webview',e=>e.preventDefault());window.webContents.on('will-navigate',(event,url)=>{if(origin&&new URL(url).origin===origin)return;event.preventDefault();external(url)});
+ window.on('close',event=>{if(quitting)return;event.preventDefault();if(closing)return;closing=true;void (async()=>{let status={active:0,blocking:0};try{status=await (await fetch(origin+'/api/desktop/status',{signal:AbortSignal.timeout(2500)})).json()}catch{}if(status.blocking){await dialog.showMessageBox(window,{type:'info',message:'Aguarde a operação isolada terminar antes de fechar.',detail:'Isso evita deixar processos de teste ou tarefas diretas em andamento.'});closing=false;return}if(status.active){const choice=await dialog.showMessageBox(window,{type:'question',buttons:['Continuar trabalhando','Cancelar execução e fechar'],defaultId:0,cancelId:0,message:'Há uma operação em andamento.',detail:'Fechar cancela a operação e encerra o serviço local. Os arquivos originais permanecem sujeitos à aprovação de gravação.'});if(choice.response===0){closing=false;return}}quitting=true;await stopWorker();app.quit()})()});
+ origin=await startWorker(state);await window.loadURL(origin);window.show();
+ }catch(e){quitting=true;await stopWorker();dialog.showErrorBox('Não foi possível abrir o Ophiuchus',e.message);app.quit()}});
+app.on('before-quit',event=>{if(!quitting&&worker){event.preventDefault();window?.close()}});app.on('window-all-closed',()=>{if(quitting)app.quit()});

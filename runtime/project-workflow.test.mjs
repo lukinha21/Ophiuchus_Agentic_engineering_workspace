@@ -6,11 +6,11 @@ import {tmpdir} from 'node:os';
 import {createProjectService} from './local-project.mjs';
 import {PROJECT_STAGES} from './project-workflow.mjs';
 const bindings=Object.fromEntries(PROJECT_STAGES.map(s=>[s.id,{providerId:'google',modelId:s.id}]));
-function answer(role){return {text:role==='developer'?JSON.stringify({summary:'Corrige soma',changes:[{path:'sum.mjs',edits:[{oldText:'a-b',newText:'a+b'}]}]}):['reviewer','qa'].includes(role)?JSON.stringify({verdict:'pass',summary:'Mudança coerente',evidence:'sum.mjs: soma os dois argumentos; parecer estático'}):role+': objetivo e critérios deste pedido',finishReason:'stop',usage:{total_tokens:10}};}
-async function fixture(t,generate){
+function answer(role){return {text:role==='developer'?JSON.stringify({summary:'Corrige soma',changes:[{path:'sum.mjs',edits:[{oldText:'a-b',newText:'a+b'}],reason:'Corrigir soma'}]}):['reviewer','qa'].includes(role)?JSON.stringify({verdict:'pass',summary:'Mudança coerente',evidence:'sum.mjs: soma os dois argumentos; parecer estático'}):JSON.stringify(role==='orchestrator'?{summary:role+': objetivo e critérios deste pedido',scope:['Corrigir soma'],criteria:['Somar argumentos'],files:['sum.mjs']}:role==='architect'?{summary:role+': objetivo e critérios deste pedido',decisions:['Preservar export'],risks:[]}:{summary:'Correção documentada',changes:['sum.mjs: soma correta'],limitations:['Sem testes executados'],checks:['Executar teste']}),finishReason:'stop',usage:{total_tokens:10}};}
+async function fixture(t,generate,options={}){
  const dir=await mkdtemp(join(tmpdir(),'ophi-flow-')),root=join(dir,'repo');await mkdir(root);await writeFile(join(root,'sum.mjs'),'export const sum=(a,b)=>a-b;');
  const calls=[],usage=[];let dockerCalls=0;
- const service=createProjectService({storageRoot:join(dir,'store'),generate:async(args,opts)=>{calls.push(args);return generate?generate(args,opts):answer(args.model)},onUsage:async r=>usage.push(r),docker:async()=>{dockerCalls++;throw Error('não executar')}});
+ const service=createProjectService({storageRoot:join(dir,'store'),generate:async(args,opts)=>{calls.push(args);return generate?generate(args,opts):answer(args.model)},onUsage:async r=>usage.push(r),docker:async()=>{dockerCalls++;throw Error('não executar')},...options});
  const project=await service.open({path:root,confirmRead:true});t.after(()=>rm(dir,{recursive:true,force:true}));
  return {service,root,calls,usage,project,get dockerCalls(){return dockerCalls},start:extra=>service.startFlow(project.id,{goal:'Corrija soma',paths:['sum.mjs'],bindings,confirmSend:true,...extra})};
 }
@@ -18,7 +18,7 @@ async function done(f,id){for(let i=0;i<400;i++){const flow=await f.service.flow
 test('six agents hand off real artifacts, isolate proposal and require explicit write',async t=>{
  const f=await fixture(t),started=await f.start(),flow=await done(f,started.id);
  assert.equal(flow.status,'READY');assert.deepEqual(f.calls.map(c=>c.model),PROJECT_STAGES.map(s=>s.id));assert.equal(flow.calls,6);assert.equal(flow.validation,'STATIC_ONLY');assert.equal(f.dockerCalls,0);
- assert.ok(f.calls[1].messages[1].content.includes('orchestrator: objetivo'));assert.ok(f.calls[2].messages[1].content.includes('architect: objetivo'));assert.ok(f.calls[3].messages[1].content.includes('a+b'));assert.ok(f.calls[3].messages[1].content.includes('a-b'));
+ assert.ok(f.calls[1].messages.some(m=>m.content.includes('orchestrator: objetivo')));assert.ok(f.calls[2].messages[1].content.includes('architect: objetivo'));assert.ok(f.calls[3].messages[1].content.includes('a+b'));assert.ok(f.calls[3].messages[1].content.includes('a-b'));
  assert.equal(f.usage.length,6);assert.equal(new Set(f.usage.map(u=>u.id)).size,6);assert.equal(await readFile(join(f.root,'sum.mjs'),'utf8'),'export const sum=(a,b)=>a-b;');
  await assert.rejects(f.service.apply(f.project.id,flow.draftId,{path:'sum.mjs',confirmWrite:false}),/Aprovação/);
  await f.service.apply(f.project.id,flow.draftId,{path:'sum.mjs',confirmWrite:true});assert.match(await readFile(join(f.root,'sum.mjs'),'utf8'),/a\+b/);
@@ -56,4 +56,60 @@ test('source changes during planning block implementation before its model call'
 });
 test('binding snapshot is fixed for ongoing run and flows cannot cross grants',async t=>{
  const f=await fixture(t),other=await f.service.open({path:f.root,confirmRead:true});let requestBindings=structuredClone(bindings);const run=await f.start({bindings:requestBindings});requestBindings.qa.modelId='changed';const flow=await done(f,run.id);assert.equal(flow.bindings.qa.modelId,'qa');await assert.rejects(f.service.flow(other.id,run.id),/não pertence/);assert.equal((await f.service.flows(f.project.id)).length,1);
+});
+
+test('timeout exposes actionable diagnostics and a single authorized resume skips completed stages',async t=>{
+ let failed=false;const f=await fixture(t,async a=>{if(a.model==='architect'&&!failed){failed=true;throw new DOMException('The operation was aborted due to timeout','TimeoutError')}return answer(a.model)});
+ const id=(await f.start()).id,first=await done(f,id);assert.equal(first.errorInfo.code,'MODEL_TIMEOUT');assert.match(first.error,/Arquiteto excedeu 90 segundos/);assert.equal(first.canResume,true);assert.equal(first.calls,2);
+ await assert.rejects(f.service.resumeFlow(f.project.id,id,{confirmSend:false}),/Autorize/);await assert.rejects(f.service.resumeFlow(f.project.id,id,{confirmSend:true,timeoutMs:999999}),/Prazo/);
+ await f.service.resumeFlow(f.project.id,id,{confirmSend:true,timeoutMs:180000});const flow=await done(f,id);assert.equal(flow.status,'READY');assert.equal(flow.calls,7);assert.equal(f.calls.filter(c=>c.model==='orchestrator').length,1);assert.equal(flow.stages[1].attempts.length,2);assert.equal(flow.stages[1].attempts[1].timeoutMs,180000);assert.ok(flow.events.some(e=>e.type==='flow.resumed'));assert.deepEqual(flow.events.map(e=>e.seq),flow.events.map((_,i)=>i+1));
+});
+
+test('repeated transport failure cannot resume endlessly or overwrite a source changed after failure',async t=>{
+ const f=await fixture(t,async a=>{if(a.model==='architect')throw new DOMException('timeout','TimeoutError');return answer(a.model)});
+ const id=(await f.start()).id;await done(f,id);await f.service.resumeFlow(f.project.id,id,{confirmSend:true});const flow=await done(f,id);assert.equal(flow.status,'FAILED');assert.equal(flow.calls,3);assert.equal(flow.canResume,false);await assert.rejects(f.service.resumeFlow(f.project.id,id,{confirmSend:true}),/não pode/);
+ const g=await fixture(t,async a=>{if(a.model==='architect')throw new DOMException('timeout','TimeoutError');return answer(a.model)}),other=(await g.start()).id;await done(g,other);await writeFile(join(g.root,'sum.mjs'),'manual');await assert.rejects(g.service.resumeFlow(g.project.id,other,{confirmSend:true}),/Conflito/);assert.equal(g.calls.length,2);await g.service.close(g.project.id);
+});
+
+test('diagnostic payload is fetched explicitly, preserves real prompts and does not leak between grants',async t=>{
+ const f=await fixture(t),flow=await done(f,(await f.start()).id);assert.equal(flow.stages[0].request.messages,undefined);const details=await f.service.flowDetails(f.project.id,flow.id,'orchestrator');assert.match(details.stage.request.messages[1].content,/a-b/);assert.ok(details.events.some(e=>e.type==='model.dispatched'));assert.ok(details.events.some(e=>e.type==='model.response'));assert.equal(details.stage.attempts[0].finishReason,'stop');
+ const other=await f.service.open({path:f.root,confirmRead:true});await assert.rejects(f.service.flowDetails(other.id,flow.id,'orchestrator'),/não pertence/);
+});
+
+test('missing credentials fail preflight without registering a flow or dispatching a model',async t=>{
+ const f=await fixture(t,undefined,{checkBindings:async()=>{throw Error('Desbloqueie o cofre')}});await assert.rejects(f.start(),/cofre/);assert.equal(f.calls.length,0);assert.equal((await f.service.flows(f.project.id)).length,0);
+});
+
+test('invalid planning contracts stop after one call, without paid repair or source writes',async t=>{
+ const f=await fixture(t,async()=>({text:'Um plano em prosa sem contrato',finishReason:'stop',usage:{total_tokens:10}}));const flow=await done(f,(await f.start()).id);assert.equal(flow.errorInfo.code,'INVALID_HANDOFF');assert.equal(flow.calls,1);assert.equal(flow.canResume,false);assert.equal(flow.draftId,null);
+});
+
+test('policy snapshots inherit common settings and preserve per-agent model bindings',async t=>{
+ const f=await fixture(t);const policy={format:'auto',cache:'explicit',agents:{qa:{format:'prompt'}}};const id=(await f.start({policy})).id;policy.agents.qa.format='auto';const flow=await done(f,id);assert.equal(flow.status,'READY');assert.equal(flow.policy.agents.qa.format,'prompt');assert.equal(f.calls.find(c=>c.model==='qa').policy.cache,'explicit');assert.equal(f.calls.find(c=>c.model==='qa').policy.format,'prompt');assert.equal(flow.bindings.qa.modelId,'qa');assert.equal(flow.events.filter(e=>e.type==='handoff.validated').length,6);
+});
+
+test('saved pre-proposal checkpoint resumes the same flow with authorized pending-model changes',async t=>{
+ const f=await fixture(t,async a=>{if(a.model==='architect')throw Error('HTTP 429 quota');return answer(a.model)});const id=(await f.start()).id,first=await done(f,id);assert.equal(first.calls,2);
+ const calls=[];const service=createProjectService({storageRoot:join(f.root,'..','store'),generate:async a=>{calls.push(a);return answer(a.model.replace(/^new-/,''))}});const project=await service.open({path:f.root,confirmRead:true});const next=Object.fromEntries(PROJECT_STAGES.map(s=>[s.id,{providerId:'google',modelId:'new-'+s.id}]));
+ await assert.rejects(service.resumeFlow(project.id,id,{savedProjectId:f.project.id,confirmSend:true,bindings:next}),/Autorize a troca/);assert.equal(calls.length,0);
+ await service.resumeFlow(project.id,id,{savedProjectId:f.project.id,confirmSend:true,confirmModelChange:true,bindings:next});const flow=await done({service,project},id);
+ assert.equal(flow.status,'READY');assert.equal(flow.id,id);assert.equal(flow.calls,7);assert.equal(calls.length,5);assert.equal(flow.bindings.orchestrator.modelId,'orchestrator');assert.equal(flow.bindings.architect.modelId,'new-architect');assert.equal(flow.bindingHistory[0].changes.length,5);assert.ok(flow.events.some(e=>e.type==='flow.restored'));assert.ok(flow.events.some(e=>e.type==='bindings.changed'));
+});
+
+test('restoring a checkpoint rejects changed sources and another project root before model dispatch',async t=>{
+ const f=await fixture(t,async()=>{throw Error('HTTP 429 quota')});const id=(await f.start()).id;await done(f,id);let calls=0;const service=createProjectService({storageRoot:join(f.root,'..','store'),generate:async()=>{calls++;throw Error('must not call')}});
+ const other=await fixture(t),wrong=await service.open({path:other.root,confirmRead:true});await assert.rejects(service.resumeFlow(wrong.id,id,{savedProjectId:f.project.id,confirmSend:true}),/outra pasta/);
+ await writeFile(join(f.root,'sum.mjs'),'manual edit');const changed=await service.open({path:f.root,confirmRead:true});await assert.rejects(service.resumeFlow(changed.id,id,{savedProjectId:f.project.id,confirmSend:true}),/Conflito/);assert.equal(calls,0);
+});
+
+test('truncated architect can resume once with a larger bounded output without repeating the plan',async t=>{
+ let attempts=0;const f=await fixture(t,async a=>a.model==='architect'&&++attempts===1?{text:'partial',finishReason:'length',usage:{total_tokens:4096}}:answer(a.model));
+ const id=(await f.start()).id,first=await done(f,id);
+ assert.equal(first.status,'FAILED');assert.equal(first.errorInfo.code,'MODEL_OUTPUT_LIMIT');assert.equal(first.canResume,true);assert.equal(first.calls,2);assert.equal(first.draftId,null);
+ assert.equal(f.calls[1].maxOutputTokens,8192);
+ await f.service.resumeFlow(f.project.id,id,{confirmSend:true});const flow=await done(f,id);
+ assert.equal(flow.status,'READY');assert.equal(flow.calls,7);assert.equal(f.calls[2].maxOutputTokens,16384);assert.match(f.calls[2].messages[0].content,/não continue o texto parcial/);assert.equal(f.calls.filter(a=>a.model==='orchestrator').length,1);assert.equal(flow.stages[1].attempts.length,2);
+});
+test('repeated truncation stops after the authorized attempt',async t=>{
+ const f=await fixture(t,async a=>a.model==='architect'?{text:'partial',finishReason:'length'}:answer(a.model));const id=(await f.start()).id;await done(f,id);await f.service.resumeFlow(f.project.id,id,{confirmSend:true});const flow=await done(f,id);assert.equal(flow.canResume,false);assert.equal(flow.calls,3);assert.equal(flow.draftId,null);
 });

@@ -6,7 +6,7 @@ export function googleOAuthConfig(env=process.env){return {enabled:googleOAuthRe
 export async function exchangeGoogleCode({code,redirectUri,verifier},env=process.env,fetchImpl=fetch){
  if(!googleOAuthReady(env))throw Error('Configure OPHIUCHUS_GOOGLE_CLIENT_ID e OPHIUCHUS_GOOGLE_CLIENT_SECRET no backend');
  if(typeof code!=='string'||code.length>2048||code.length<8||typeof verifier!=='string'||!/^[A-Za-z0-9._~-]{43,128}$/.test(verifier))throw Error('Código OAuth/PKCE inválido');
- const redirect=new URL(redirectUri);if(!['localhost','127.0.0.1'].includes(redirect.hostname)||redirect.protocol!=='http:'||!['5173','4317'].includes(redirect.port)||redirect.search||redirect.hash)throw Error('Redirect OAuth local inválido');
+ const redirect=new URL(redirectUri);if(!['localhost','127.0.0.1'].includes(redirect.hostname)||redirect.protocol!=='http:'||(!['5173','4317'].includes(redirect.port)&&redirect.origin!==env.OPHIUCHUS_DESKTOP_ORIGIN)||redirect.search||redirect.hash)throw Error('Redirect OAuth local inválido');
  const params=new URLSearchParams({code,client_id:env.OPHIUCHUS_GOOGLE_CLIENT_ID,client_secret:env.OPHIUCHUS_GOOGLE_CLIENT_SECRET,redirect_uri:redirect.toString(),grant_type:'authorization_code',code_verifier:verifier});
  const response=await fetchImpl(TOKEN,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:params,signal:AbortSignal.timeout(15000)});
  if(!response.ok)throw Error(`Google OAuth recusou a autorização (HTTP ${response.status})`);

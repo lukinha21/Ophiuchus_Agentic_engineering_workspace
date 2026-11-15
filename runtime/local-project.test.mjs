@@ -115,7 +115,7 @@ test('follow-up includes bounded conversation while a fresh chat carries no prev
 test('truncation recovers once with a smaller scope, accounts both calls and discards partial code',async t=>{
  const calls=[];const reports=[];
  const f=await fixture(t,async(args,options)=>{calls.push(args);assert.ok(options.signal);return calls.length===1?{text:'{"summary":"partial","changes":[',finishReason:'length',usage:{prompt_tokens:10,completion_tokens:20,total_tokens:30}}:proposal([{path:'src/sum.mjs',edits:[{oldText:'a-b',newText:'a+b'}]}]);},undefined,async report=>reports.push(report));
- const r=await task(f,{paths:['src/sum.mjs','package.json']});assert.equal(calls.length,2);assert.equal(reports.length,2);assert.notEqual(reports[0].id,reports[1].id);assert.equal(reports.reduce((n,r)=>n+r.usage.total_tokens,0),60);assert.equal(calls[0].maxOutputTokens,4096);assert.equal(calls[1].maxOutputTokens,4096);
+ const r=await task(f,{paths:['src/sum.mjs','package.json']});assert.equal(calls.length,2);assert.equal(reports.length,2);assert.notEqual(reports[0].id,reports[1].id);assert.equal(reports.reduce((n,r)=>n+r.usage.total_tokens,0),60);assert.equal(calls[0].maxOutputTokens,8192);assert.equal(calls[1].maxOutputTokens,16384);
  assert.match(calls[1].messages[1].content,/RECUPERAÇÃO LIMITADA/);assert.doesNotMatch(calls[1].messages[1].content,/"type":"module"/);
  assert.match(r.draft.summary,/Escopo reduzido/);assert.equal(r.draft.usage.total_tokens,60);assert.equal(r.draft.changes[0].content,'export const sum=(a,b)=>a+b;\n');
  assert.match(await readFile(join(f.root,'src/sum.mjs'),'utf8'),/a-b/);
@@ -142,4 +142,11 @@ test('analysis truncation and provider errors do not trigger automatic retries',
 test('cancellation during first attempt prevents recovery',async t=>{
  const controller=new AbortController();let calls=0;const f=await fixture(t,async()=>{calls++;controller.abort();return {text:'partial',finishReason:'length'}});
  await assert.rejects(f.service.task(f.project.id,{goal:'melhore',mode:'propose',paths:['src/sum.mjs'],binding,confirmSend:true},{signal:controller.signal}),/abort/i);assert.equal(calls,1);
+});
+
+test('no compatible test suite is reported as unavailable without Docker or false failure',async t=>{
+ let dockerCalls=0;const f=await fixture(t,undefined,async()=>{dockerCalls++;throw Error('must not run')});
+ await rm(join(f.root,'tests/sum.test.mjs'));const r=await task(f);assert.equal(r.draft.testPlan.available,false);assert.match(r.draft.testPlan.reason,/Nenhuma suíte/);
+ const d=await f.service.test(f.project.id,r.draft.id,{confirmExecute:true});assert.equal(d.test.status,'NOT_RUN');assert.equal(d.test.passed,null);assert.equal(dockerCalls,0);assert.equal(d.status,r.draft.status);
+ await f.service.apply(f.project.id,r.draft.id,{path:'src/sum.mjs',confirmWrite:true});const applied=await f.service.test(f.project.id,r.draft.id,{confirmExecute:true});assert.equal(applied.status,'APPLIED');assert.equal(applied.test.status,'NOT_RUN');
 });
