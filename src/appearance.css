@@ -1,0 +1,41 @@
+/* Palette and reading size are independent from information density. */
+.ophi-studio{--studio-paper:#f5f6f8;--studio-surface:#ffffff;--studio-ink:#202a38;--studio-muted:#586476;--studio-rule:#d5dbe4;--studio-green:#365db0;--studio-soft:#e7edf8;--studio-alert:#a03e25;--reading:1;font-size:15px;line-height:1.6}
+.ophi-studio.theme-dark{--studio-paper:#15171c;--studio-surface:#1d2027;--studio-ink:#e9edf5;--studio-muted:#b1bacb;--studio-rule:#3b4251;--studio-green:#a4baff;--studio-soft:#2a3348;--studio-alert:#f1b298}
+.ophi-studio.theme-midnight{--studio-paper:#111a2b;--studio-surface:#18243a;--studio-ink:#e9efff;--studio-muted:#adbed7;--studio-rule:#384c6b;--studio-green:#a5bcff;--studio-soft:#283a5c;--studio-alert:#f3b49d}
+.ophi-studio.theme-ocean{--studio-paper:#102325;--studio-surface:#193032;--studio-ink:#e5f3f2;--studio-muted:#a8c5c4;--studio-rule:#3b5c5e;--studio-green:#83d9cd;--studio-soft:#254747;--studio-alert:#f2bda2}
+.ophi-studio.theme-sand{--studio-paper:#f5f0e7;--studio-surface:#fffcf5;--studio-ink:#382e25;--studio-muted:#706050;--studio-rule:#d9cebc;--studio-green:#8a4c27;--studio-soft:#eee0cd;--studio-alert:#a43727}
+.ophi-studio.theme-forest{--studio-paper:#14211c;--studio-surface:#1c2d25;--studio-ink:#e7f0ea;--studio-muted:#b1c5b8;--studio-rule:#3c5948;--studio-green:#9ccfb4;--studio-soft:#2c4738;--studio-alert:#f1b79a}
+.ophi-studio.text-large{--reading:1.13}
+.ophi-studio :is(.v5-body,.v5-page,.v5-center,.analytics-page){background:var(--studio-paper);color:var(--studio-ink)}
+.ophi-studio :is(.v5-project-sidebar,.v5-inspector,.v5-preferences,.v5-composer,.analytics-card,.kpi-card,.project-draft,.flow-ledger,.flow-current,.flow-resume){background:var(--studio-surface)!important;color:var(--studio-ink)!important;border-color:var(--studio-rule)!important}
+.ophi-studio :is(.v5-wordmark strong,.v5-console-heading h1,.studio-start h2,.project-root-name,.project-chat-empty h2,.project-draft h2,.analytics-head h2,.kpi-card strong,.dash-top h1,.model-label strong,.model-value,.donut strong){color:var(--studio-ink)!important}
+.ophi-studio :is(p,label,td,th,input,textarea,select,.artifact-markdown,.v5-chat-response,.v5-chat-bubble){font-size:calc(14px * var(--reading))!important;line-height:1.75}
+.ophi-studio :is(p,label,.v5-chat-response p,.v5-chat-bubble p,.analytics-page td,.project-context-bar,.local-project){color:var(--studio-ink)!important}
+.ophi-studio :is(small,.v5-kicker,.eyebrow,.flow-eyebrow,.flow-ledger footer,.v5-chat-by,.flow-stations span,.debug-observation,.debug-events time,.debug-events code,.project-console-note,.demo-explainer,.chart-foot,.v5-pref-hint){font-size:calc(12px * var(--reading))!important;line-height:1.6;color:var(--studio-muted)!important;letter-spacing:.015em}
+.ophi-studio :is(button,summary,.flow-stations strong,.debug-events strong,.debug-tabs button,.debug-event-filters button){font-size:calc(13px * var(--reading))!important;line-height:1.5}
+.ophi-studio :is(.debug-summary dd,.debug-state,.debug-context,.debug-budget,.debug-select-label,.debug-failure,.debug-failure strong,.debug-summary dt){font-size:calc(12px * var(--reading))!important}
+.ophi-studio :is(.project-inspector-content pre,.local-project pre,code){font-size:calc(12px * var(--reading))!important;line-height:1.7;color:var(--studio-ink)!important}
+.ophi-studio :is(button,input,textarea,select,.analytics-card,.kpi-card,td,th){border-color:var(--studio-rule)!important}
+.ophi-studio :is(.local-project button,.v5-top-actions button,.v5-inspector-open,.period-picker,.chart-switch,.dash-console,.dash-pagination button,.health-grid>div,.project-inspector-content button){background:var(--studio-surface);color:var(--studio-ink)}
+.ophi-studio :is(input:not([type=checkbox]),textarea,select){background:var(--studio-surface)!important;color:var(--studio-ink)!important}
+.ophi-studio :is(input,textarea)::placeholder{color:var(--studio-muted)!important;opacity:1}
+.ophi-studio .analytics-page th{background:var(--studio-soft);color:var(--studio-ink);text-align:left}
+.ophi-studio .analytics-page td{padding:14px 12px!important}.ophi-studio .analytics-page th{padding:12px!important}
+.ophi-studio :is(.model-track,.v5-mode-cards .selected,.v5-segment .selected,.project-inspector-content [aria-pressed=true],.theme-picker .selected){background:var(--studio-soft)!important;color:var(--studio-ink)!important}
+.ophi-studio .v5-dock{background:var(--studio-ink)}.ophi-studio.theme-dark .v5-dock{background:var(--studio-surface)}
+.ophi-studio .v5-dock>button{color:var(--studio-paper)}.ophi-studio.theme-dark .v5-dock>button{color:var(--studio-muted)}
+.ophi-studio .v5-dock>button.active{background:var(--studio-soft);color:var(--studio-green)}
+.ophi-studio .v5-logo{color:var(--studio-paper)}.ophi-studio.theme-dark .v5-logo{color:var(--studio-green)}
+.ophi-brand-symbol{display:block;width:38px;height:38px;flex-shrink:0}.flow-sign .ophi-brand-symbol{width:30px;height:30px}
+.ophi-studio .v5-tabs button{color:var(--studio-muted)}.ophi-studio .v5-tabs button.active{color:var(--studio-green);border-color:var(--studio-green)}
+.ophi-studio .v5-send{background:var(--studio-green)!important;color:var(--studio-paper)!important}
+.ophi-studio .v5-preferences{width:min(540px,100vw);max-height:100dvh;overflow:auto}
+.theme-picker{display:grid;grid-template-columns:1fr 1fr;gap:10px}.theme-picker button{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--studio-rule);border-radius:8px;text-align:left;background:var(--studio-paper);color:var(--studio-ink)}
+.theme-picker button[aria-pressed=true]{outline:2px solid var(--studio-green);outline-offset:1px}.theme-picker strong,.theme-picker small{display:block}.theme-swatch{display:grid;place-items:center;position:relative;flex-shrink:0;width:48px;height:48px;border:1px solid;border-radius:6px;font:600 17px Georgia,serif}.theme-swatch i{position:absolute;bottom:4px;width:20px;height:3px;border-radius:3px}
+.ophi-studio button:focus-visible,.ophi-studio input:focus-visible,.ophi-studio textarea:focus-visible{outline:2px solid var(--studio-green)!important;outline-offset:3px}
+.ophi-studio :is(.v5-segment,.v5-mode-cards button,.v5-switch-row,.kpi-icon,.v5-pref-section select){background:var(--studio-paper)!important;color:var(--studio-ink)!important;border-color:var(--studio-rule)!important}
+.ophi-studio :is(.v5-segment button.selected,.v5-mode-cards button.selected,.period-picker button.chosen,.chart-switch button.chosen){background:var(--studio-soft)!important;color:var(--studio-ink)!important;border-color:var(--studio-green)!important}
+.ophi-studio :is(.v5-live,.v5-wordmark small,.v5-composer-bottom,.model-label small,.trend-axis,.donut-legend,.health-grid small){font-size:calc(12px * var(--reading))!important;color:var(--studio-muted)!important}
+.ophi-brand-symbol{background:none!important;box-shadow:none!important;padding:0!important;border:0!important;color:inherit!important;border-radius:0!important}
+.ophi-studio .flow-stations{gap:12px;overflow-x:auto}.ophi-studio .flow-stations button{min-width:100px}.ophi-studio .flow-ledger footer{flex-wrap:wrap;gap:8px}.ophi-studio .project-test-unavailable{color:var(--studio-muted)}
+@media(max-width:600px){.theme-picker{grid-template-columns:1fr}.ophi-studio .v5-tabs button{font-size:0!important}.ophi-studio .v5-center{padding-left:16px;padding-right:16px}}

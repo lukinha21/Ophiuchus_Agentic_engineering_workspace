@@ -103,7 +103,7 @@ export function createProjectService({storageRoot=process.env.OPHIUCHUS_PROJECTS
     response=await request(attempt?[included[0]]:included,attempt>0);
     attempts.push(response);await onModelResponse(response);
     // Each paid attempt has its own dashboard entry, even on failure.
-    await onUsage({id:attempt?draftId+':retry':draftId,projectId:id,mode,binding,usage:response.usage||null,at:new Date().toISOString()});
+    await onUsage({id:attempt?draftId+':retry':draftId,projectId:id,workflowId,mode,binding,usage:response.usage||null,at:new Date().toISOString()});
     await writeFile(join(dir,attempt?'response-retry.json':'response.json'),JSON.stringify({goal,mode,binding,contextPaths:(attempt?[included[0]]:included).map(f=>f.path),...response},null,2),{mode:0o600});
     await grant(id);await audit(p,{type:'project.model.response',mode,attempt:attempt+1,finishReason:response.finishReason,usage:response.usage||null,binding,contextPaths:(attempt?[included[0]]:included).map(f=>f.path),draftId});
     if(response.finishReason!=='length')break;
