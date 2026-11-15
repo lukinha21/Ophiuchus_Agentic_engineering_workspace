@@ -37,7 +37,7 @@ function normalizeMessages(messages){return messages.map(m=>({role:m.role==='ass
 export async function generateText({providerId,model,messages,maxOutputTokens=600,allowEmptyTruncated=false},{env=process.env,fetchImpl=fetch,signal}={}){
  const p=resolveProvider(providerId,env);if(!p.configured)throw Error('Provedor não configurado no servidor');
  if(typeof model!=='string'||!model.trim()||!Array.isArray(messages)||!messages.length)throw Error('Modelo e mensagens obrigatórios');
- if(!Number.isInteger(maxOutputTokens)||maxOutputTokens<1||maxOutputTokens>4096)throw Error('Limite de saída inválido');
+ if(!Number.isInteger(maxOutputTokens)||maxOutputTokens<1||maxOutputTokens>16384)throw Error('Limite de saída inválido');
  let url,body;
  if(p.kind==='gemini'){
   if(!/^[a-zA-Z0-9._-]{1,128}$/.test(model))throw Error('Modelo Gemini inválido');
