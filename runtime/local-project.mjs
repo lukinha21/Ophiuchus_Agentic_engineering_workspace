@@ -55,7 +55,8 @@ export function createProjectService({storageRoot=process.env.OPHIUCHUS_PROJECTS
    }
   }await walk(p.root);return {files,warnings,rules};
  }
- const publicDraft=d=>({id:d.id,goal:d.goal,summary:d.summary,createdAt:d.createdAt,status:d.status,changes:d.changes.map(c=>({...c,diff:lineDiff(c.before||'',c.content)})),test:d.test||null,usage:d.usage,binding:d.binding,contextPaths:d.contextPaths,workflowId:d.workflowId||null});
+ const testPlan=d=>{const paths=[...new Set([...d.manifest.map(f=>f.path),...d.changes.map(c=>c.path)])].map(path=>({path})),tests=testFiles(paths,{language:'javascript'});return {available:tests.length>0&&tests.length<=100,tests,reason:!tests.length?'Nenhuma suíte node:test encontrada nesta cópia. Projetos HTML/Canvas como este precisam de validação no navegador; ela ainda não é executada por este botão. As alterações e os pareceres do fluxo continuam válidos.':tests.length>100?'Esta cópia contém mais de 100 arquivos de teste. Reduza a seleção antes de executar.':null};};
+ const publicDraft=d=>({id:d.id,goal:d.goal,summary:d.summary,createdAt:d.createdAt,status:d.status,testPlan:testPlan(d),changes:d.changes.map(c=>({...c,diff:lineDiff(c.before||'',c.content)})),test:d.test||null,usage:d.usage,binding:d.binding,contextPaths:d.contextPaths,workflowId:d.workflowId||null});
  async function audit(p,event){p.events.push({at:new Date().toISOString(),...event});await mkdir(p.dir,{recursive:true,mode:0o700});await writeFile(join(p.dir,'session.json'),JSON.stringify({id:p.id,root:p.root,events:p.events},null,2),{mode:0o600});}
  async function openProject({path,confirmRead}){
   if(confirmRead!==true||typeof path!=='string'||!isAbsolute(path))throw Error('Informe caminho absoluto e autorize a leitura');
@@ -166,7 +167,7 @@ export function createProjectService({storageRoot=process.env.OPHIUCHUS_PROJECTS
  }
  async function testDraft(id,draftId,{confirmExecute}){
   const p=await grant(id),d=p.drafts.get(draftId);if(!d||p.busy||p.workflowId||confirmExecute!==true)throw Error('Autorize a execução isolada do rascunho');p.busy=true;
-  try{const paths=[...new Set([...d.manifest.map(f=>f.path),...d.changes.map(c=>c.path)])].map(path=>({path})),tests=testFiles(paths,{language:'javascript'});if(!tests.length||tests.length>100)throw Error('Esta etapa suporta até 100 arquivos node:test (.test/.spec.js ou .mjs), sem instalar dependências');
+  try{const plan=testPlan(d),tests=plan.tests;if(!plan.available){d.test={status:'NOT_RUN',passed:null,output:plan.reason,tests,at:new Date().toISOString(),scope:'ISOLATED_DRAFT'};await saveDraft(p,d);return publicDraft(d);}
    const result=await docker(dockerArgs(d.worktree,tests),{timeoutMs:30000});d.test={...result,tests,at:new Date().toISOString(),scope:'ISOLATED_DRAFT',sourceHashes:d.changes.map(c=>({path:c.path,sha256:c.afterHash}))};await saveDraft(p,d);return publicDraft(d);
   }finally{p.busy=false;}
  }

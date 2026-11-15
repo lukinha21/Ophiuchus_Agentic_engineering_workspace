@@ -143,3 +143,10 @@ test('cancellation during first attempt prevents recovery',async t=>{
  const controller=new AbortController();let calls=0;const f=await fixture(t,async()=>{calls++;controller.abort();return {text:'partial',finishReason:'length'}});
  await assert.rejects(f.service.task(f.project.id,{goal:'melhore',mode:'propose',paths:['src/sum.mjs'],binding,confirmSend:true},{signal:controller.signal}),/abort/i);assert.equal(calls,1);
 });
+
+test('no compatible test suite is reported as unavailable without Docker or false failure',async t=>{
+ let dockerCalls=0;const f=await fixture(t,undefined,async()=>{dockerCalls++;throw Error('must not run')});
+ await rm(join(f.root,'tests/sum.test.mjs'));const r=await task(f);assert.equal(r.draft.testPlan.available,false);assert.match(r.draft.testPlan.reason,/Nenhuma suíte/);
+ const d=await f.service.test(f.project.id,r.draft.id,{confirmExecute:true});assert.equal(d.test.status,'NOT_RUN');assert.equal(d.test.passed,null);assert.equal(dockerCalls,0);assert.equal(d.status,r.draft.status);
+ await f.service.apply(f.project.id,r.draft.id,{path:'src/sum.mjs',confirmWrite:true});const applied=await f.service.test(f.project.id,r.draft.id,{confirmExecute:true});assert.equal(applied.status,'APPLIED');assert.equal(applied.test.status,'NOT_RUN');
+});
