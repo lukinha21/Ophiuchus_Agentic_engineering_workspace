@@ -1,10 +1,12 @@
 export const themes=[
  {id:'light',name:'Papel',description:'Claro e neutro',bg:'#f5f6f8',ink:'#202a38',accent:'#365db0',dark:false},
- {id:'dark',name:'Grafite',description:'Escuro sem dominante verde',bg:'#15171c',ink:'#e9edf5',accent:'#a4baff',dark:true},
- {id:'midnight',name:'Meia-noite',description:'Azul profundo',bg:'#111a2b',ink:'#e9efff',accent:'#a5bcff',dark:true},
- {id:'ocean',name:'Oceano',description:'Petróleo e água',bg:'#102325',ink:'#e5f3f2',accent:'#83d9cd',dark:true},
+ {id:'lavender',name:'Lavanda',description:'Claro com violeta suave',bg:'#f5f3fa',ink:'#302b40',accent:'#7054ba',dark:false},
+ {id:'dusk',name:'Crepúsculo',description:'Lavanda em tons escuros suaves',bg:'#23212c',ink:'#eeebf5',accent:'#c3adef',dark:true},
+ {id:'dark',name:'Grafite',description:'Escuro sem dominante verde',bg:'#22252b',ink:'#e9edf5',accent:'#a4baff',dark:true},
+ {id:'midnight',name:'Meia-noite',description:'Azul profundo',bg:'#202a3b',ink:'#e9efff',accent:'#a5bcff',dark:true},
+ {id:'ocean',name:'Oceano',description:'Petróleo e água',bg:'#203134',ink:'#e5f3f2',accent:'#83d9cd',dark:true},
  {id:'sand',name:'Areia',description:'Claro e acolhedor',bg:'#f5f0e7',ink:'#382e25',accent:'#8a4c27',dark:false},
- {id:'forest',name:'Floresta',description:'Verde discreto',bg:'#14211c',ink:'#e7f0ea',accent:'#9ccfb4',dark:true}
+ {id:'forest',name:'Floresta',description:'Verde discreto',bg:'#26332d',ink:'#e7f0ea',accent:'#9ccfb4',dark:true}
 ] as const
 export type ThemeId=typeof themes[number]['id']
 export function readTheme():ThemeId{try{const id=localStorage.getItem('ophiuchus.theme');if(themes.some(t=>t.id===id))return id as ThemeId}catch{}return 'light'}

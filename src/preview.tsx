@@ -3,6 +3,7 @@
 import {createRoot} from 'react-dom/client'
 import './styles.css'
 import App from './App'
+import {defaultAgents} from './mockOrchestrator'
 import type {ProjectFlowState} from './ProjectFlow'
 if(!import.meta.env.DEV)throw Error('Prévia disponível somente no servidor de desenvolvimento')
 const stages=[['orchestrator','Direção','Orquestrador'],['architect','Estrutura','Arquiteto'],['developer','Implementação','Desenvolvedor'],['reviewer','Revisão','Revisor'],['qa','Critérios','QA'],['documentation','Entrega','Documentação']]
@@ -27,10 +28,17 @@ function flow():ProjectFlowState{
  return {id:flowId,projectId:project.id,goal:'Simplifique a navegação do projeto e preserve os comportamentos existentes.',status:cancelled?'CANCELLED':failed?'FAILED':scenario==='blocked'?'BLOCKED':index===6?'READY':'RUNNING',stage:stages[Math.min(index,5)][0],calls:resumed?7:Math.min(index+1,6),maxCalls:7,contextPaths:['src/App.tsx','src/components/Navigation.tsx'],draftId:index>=3?draftId:null,summary:index===6?text.documentation:'',error:errorInfo?.message||(cancelled?'Execução cancelada. Nenhuma alteração aplicada.':scenario==='blocked'?'Revisor solicitou ajustes: foco de teclado não está visível.':null),errorInfo,canResume:failed,validation:index===6?'STATIC_ONLY':'NOT_EXECUTED',bindings,stages:stageStates,events}
 }
 const draft=()=>({id:draftId,workflowId:flowId,goal:'Simplifique a navegação.',summary:text.developer,status:applied?'APPLIED':'REVIEW_REQUIRED',contextPaths:['src/components/Navigation.tsx'],changes:[{path:'src/components/Navigation.tsx',before:'<a href="/projeto">Projeto</a>',content:'<a href="/projeto" aria-current="page">Projeto</a>',reason:'Expõe a página atual para tecnologias assistivas.',applied,diff:{tooLarge:false,lines:[{kind:'remove',text:'<a href="/projeto">Projeto</a>'},{kind:'add',text:'<a href="/projeto" aria-current="page">Projeto</a>'}]}}],test:null})
+const legacyRun={id:'preview-runtime',prompt:'Crie uma pequena aplicação JavaScript com um gerador de números.',status:'RUNNING',stage:'review',createdAt:new Date().toISOString(),corrections:0,approval:null,configSnapshot:defaultAgents,history:['discovery','specification','architecture','implementation'],events:[{id:'event-1',at:new Date().toISOString(),type:'run.started',stage:'discovery'},{id:'event-2',at:new Date().toISOString(),type:'stage.started',stage:'review'}],artifacts:['discovery','specification','architecture','implementation'].map((stage,i)=>({id:'artifact-'+i,stage,text:'Proposta de implementação JavaScript.\n\n```js file=src/randomGenerator.js\nexport const random = () => Math.random();\n```',providerId:'google',model:'modelo-simulado',integrity:'complete',finishReason:'stop',at:new Date().toISOString(),usage:{total_tokens:400}}))};
+let executionOptions={mode:'balanced',maxOutputTokens:1400,historyArtifacts:7,artifactChars:6500,keepRecent:2,autonomy:'supervised',maxContinuations:2};
 window.fetch=async(input,init)=>{
  const url=new URL(typeof input==='string'?input:input instanceof Request?input.url:input.toString(),location.origin),path=url.pathname.replace(/^\/api/,'')
  let data:unknown={error:'Rota ausente na simulação'},status=200
- if(path==='/projects/picker/cancel')data={cancelled:true}
+ if(path==='/execution-options'){if(init?.body)executionOptions=JSON.parse(String(init.body));data=executionOptions}
+ else if(path==='/runs'||path==='/runs/preview-runtime')data=legacyRun
+ else if(path==='/runs/preview-runtime/workspace/proposals')data={artifactId:'artifact-3',files:[{path:'src/randomGenerator.js',content:'export const random = () => Math.random();'}]}
+ else if(path==='/runs/preview-runtime/workspace')data={files:[{path:'src/randomGenerator.js',bytes:1800}]}
+ else if(path.includes('/models'))data=[{id:'modelo-simulado'},{id:'modelo-compacto'}]
+ else if(path==='/projects/picker/cancel')data={cancelled:true}
  else if(path==='/health')data={ok:true}
  else if(path==='/bindings')data=bindings
  else if(path==='/projects/pick'||path==='/projects/open'||path===`/projects/${project.id}`)data=project
@@ -46,14 +54,14 @@ window.fetch=async(input,init)=>{
  else if(path.endsWith('/apply')){applied=true;data=draft()}
  else if(path.endsWith('/undo')){applied=false;data=draft()}
  else if(path.endsWith('/'+draftId))data=draft()
- else if(path==='/providers')data=[{id:'google',name:'Google Gemini (simulado)',configured:true}]
+ else if(path==='/providers')data=[{id:'openai',name:'OpenAI',configured:true},{id:'google',name:'Google Gemini',configured:true},{id:'anthropic',name:'Anthropic',configured:true}]
  else if(path==='/metrics')data={runs:0,success:0,blocked:0,calls:0,input:0,output:0,unknownUsage:0,models:[],runsDetail:[],trend:[],tests:0,testsPassed:0}
  else if(path==='/vault')data={exists:true,unlocked:false,configured:[]}
  else if(path.endsWith('/close'))data={closed:true}
  else status=400
  return new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}})
 }
-localStorage.removeItem('ophiuchus.activeRun')
+if(new URLSearchParams(location.search).get('screen')==='legacy')localStorage.setItem('ophiuchus.activeRun','preview-runtime');else localStorage.removeItem('ophiuchus.activeRun')
 const banner=document.createElement('div');banner.className='studio-preview-banner';banner.textContent='PRÉVIA LOCAL / DADOS SIMULADOS / NENHUMA CHAMADA A MODELOS';document.body.prepend(banner)
 const style=document.createElement('style');style.textContent='.studio-preview-banner{position:fixed;top:0;left:0;right:0;z-index:9999;height:26px;display:flex;align-items:center;justify-content:center;background:#ded9bb;color:#605f42;font:9px ui-monospace,monospace;letter-spacing:.1em}.ophi-studio{position:fixed;top:26px;left:0;right:0;bottom:0;height:calc(100dvh - 26px)!important}';document.head.append(style)
 createRoot(document.getElementById('root')!).render(<App/> )

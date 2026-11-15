@@ -1,10 +1,10 @@
 /* Palette and reading size are independent from information density. */
 .ophi-studio{--studio-paper:#f5f6f8;--studio-surface:#ffffff;--studio-ink:#202a38;--studio-muted:#586476;--studio-rule:#d5dbe4;--studio-green:#365db0;--studio-soft:#e7edf8;--studio-alert:#a03e25;--reading:1;font-size:15px;line-height:1.6}
-.ophi-studio.theme-dark{--studio-paper:#15171c;--studio-surface:#1d2027;--studio-ink:#e9edf5;--studio-muted:#b1bacb;--studio-rule:#3b4251;--studio-green:#a4baff;--studio-soft:#2a3348;--studio-alert:#f1b298}
-.ophi-studio.theme-midnight{--studio-paper:#111a2b;--studio-surface:#18243a;--studio-ink:#e9efff;--studio-muted:#adbed7;--studio-rule:#384c6b;--studio-green:#a5bcff;--studio-soft:#283a5c;--studio-alert:#f3b49d}
-.ophi-studio.theme-ocean{--studio-paper:#102325;--studio-surface:#193032;--studio-ink:#e5f3f2;--studio-muted:#a8c5c4;--studio-rule:#3b5c5e;--studio-green:#83d9cd;--studio-soft:#254747;--studio-alert:#f2bda2}
+.ophi-studio.theme-dark{--studio-paper:#22252b;--studio-surface:#2b2f37;--studio-ink:#e9edf5;--studio-muted:#b1bacb;--studio-rule:#3b4251;--studio-green:#a4baff;--studio-soft:#2a3348;--studio-alert:#f1b298}
+.ophi-studio.theme-midnight{--studio-paper:#202a3b;--studio-surface:#2a364b;--studio-ink:#e9efff;--studio-muted:#adbed7;--studio-rule:#384c6b;--studio-green:#a5bcff;--studio-soft:#283a5c;--studio-alert:#f3b49d}
+.ophi-studio.theme-ocean{--studio-paper:#203134;--studio-surface:#293e41;--studio-ink:#e5f3f2;--studio-muted:#a8c5c4;--studio-rule:#3b5c5e;--studio-green:#83d9cd;--studio-soft:#254747;--studio-alert:#f2bda2}
 .ophi-studio.theme-sand{--studio-paper:#f5f0e7;--studio-surface:#fffcf5;--studio-ink:#382e25;--studio-muted:#706050;--studio-rule:#d9cebc;--studio-green:#8a4c27;--studio-soft:#eee0cd;--studio-alert:#a43727}
-.ophi-studio.theme-forest{--studio-paper:#14211c;--studio-surface:#1c2d25;--studio-ink:#e7f0ea;--studio-muted:#b1c5b8;--studio-rule:#3c5948;--studio-green:#9ccfb4;--studio-soft:#2c4738;--studio-alert:#f1b79a}
+.ophi-studio.theme-forest{--studio-paper:#26332d;--studio-surface:#304238;--studio-ink:#e7f0ea;--studio-muted:#b1c5b8;--studio-rule:#3c5948;--studio-green:#9ccfb4;--studio-soft:#2c4738;--studio-alert:#f1b79a}
 .ophi-studio.text-large{--reading:1.13}
 .ophi-studio :is(.v5-body,.v5-page,.v5-center,.analytics-page){background:var(--studio-paper);color:var(--studio-ink)}
 .ophi-studio :is(.v5-project-sidebar,.v5-inspector,.v5-preferences,.v5-composer,.analytics-card,.kpi-card,.project-draft,.flow-ledger,.flow-current,.flow-resume){background:var(--studio-surface)!important;color:var(--studio-ink)!important;border-color:var(--studio-rule)!important}

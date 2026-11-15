@@ -21,6 +21,7 @@ import './engineering.css'
 import {BrandMark,ThemePicker,themes,readTheme} from './Appearance'
 import type {ThemeId} from './Appearance'
 import './appearance.css'
+import './visual-system.css'
 
 type Mode = 'focus' | 'engineering'
 type Density = 'comfortable' | 'compact'
