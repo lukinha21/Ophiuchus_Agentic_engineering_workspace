@@ -1,0 +1,67 @@
+/* Operational views are tied to project flows; focus keeps the conversation light. */
+.project-engineering-inspector{padding:20px 16px!important}
+.project-inspector-content{min-width:0;color:var(--studio-ink);font-size:12px}
+.project-inspector-content>header{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:21px}
+.project-inspector-content h3{font:23px Georgia,serif;letter-spacing:-.5px;margin:7px 0 0;color:var(--studio-ink)}
+.project-inspector-content button{border:1px solid var(--studio-rule);background:transparent;color:var(--studio-ink);border-radius:4px;padding:7px;font-size:10px;cursor:pointer}
+.project-inspector-content>header>button{padding:5px}
+.debug-empty{color:var(--studio-muted);font-size:12px;line-height:1.8}
+.debug-select-label{display:flex;flex-direction:column;gap:8px;color:var(--studio-muted);font-size:10px}
+.debug-select-label select{width:100%;min-width:0;max-width:100%;padding:9px 7px;border:1px solid var(--studio-rule);background:var(--studio-surface);color:var(--studio-ink);border-radius:4px;font-size:11px;text-overflow:ellipsis}
+.debug-stage-selector{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin:15px 0}
+.debug-stage-selector button{font:10px ui-monospace,monospace;padding:8px 2px}
+.debug-stage-selector [aria-pressed=true],.debug-tabs [aria-pressed=true],.debug-event-filters [aria-pressed=true]{background:var(--studio-soft);border-color:var(--studio-green);color:var(--studio-ink)}
+.debug-tabs{display:grid;grid-template-columns:.9fr .9fr 1.4fr;gap:4px;border-bottom:1px solid var(--studio-rule);padding-bottom:14px;margin-bottom:17px}
+.debug-tabs button{font-size:10px;white-space:nowrap;padding:8px 3px}
+.debug-state{display:flex;align-items:flex-start;gap:7px;line-height:1.5;font-size:11px;margin:15px 0}
+.debug-state .flow-state-dot{margin-top:5px}
+.debug-summary dl{margin:0}.debug-summary dl>div{padding:11px 0;border-bottom:1px solid var(--studio-rule)}
+.debug-summary dt{display:flex;align-items:center;gap:5px;font:9px ui-monospace,monospace;color:var(--studio-muted);margin-bottom:7px}
+.debug-summary dd{margin:0;font-size:12px;line-height:1.7;overflow-wrap:anywhere}
+.debug-context,.debug-artifact,.debug-budget{padding:13px 0;border-bottom:1px solid var(--studio-rule);font-size:10px;min-width:0}
+.debug-context summary,.debug-artifact summary,.debug-budget summary{cursor:pointer;color:var(--studio-muted)}
+.debug-context summary svg{vertical-align:middle;margin-right:5px}.debug-context code{display:block;font:10px/1.7 ui-monospace,monospace;color:var(--studio-ink);overflow-wrap:anywhere;margin-top:8px}
+.debug-failure{padding:13px;margin:16px 0;border:1px solid #aa795e55;border-left:2px solid #b68a68;background:#b68a680b;border-radius:4px;font-size:10px;overflow-wrap:anywhere}
+.debug-failure>svg{vertical-align:middle;margin-right:6px;color:var(--studio-alert)}
+.debug-failure>strong{font:9px ui-monospace,monospace;letter-spacing:.04em}.debug-failure p{line-height:1.8;font-size:11px;color:var(--studio-ink)}
+.debug-failure summary{cursor:pointer;color:var(--studio-muted);font-size:10px}
+.debug-observation{font-size:10px!important;color:var(--studio-muted)!important;line-height:1.8;padding:7px 0}
+.debug-budget p,.debug-budget>div{font-size:10px;color:var(--studio-muted);line-height:1.8;margin-top:10px}
+.debug-events{min-width:0}.debug-event-filters{display:flex;gap:5px;margin-bottom:15px}.debug-event-filters button{flex:1;font-size:9px}
+.debug-events article{border-left:1px solid var(--studio-rule);padding:4px 0 13px 12px;margin-bottom:9px;position:relative}
+.debug-events article::before{content:'';position:absolute;width:5px;height:5px;border-radius:50%;left:-3px;top:9px;background:var(--studio-green)}
+.debug-events article.event-error::before{background:var(--studio-alert)}
+.debug-events time{display:block;font:8px ui-monospace,monospace;color:var(--studio-muted);margin-bottom:6px}
+.debug-events strong{display:block;font-size:11px;font-weight:500;line-height:1.7;overflow-wrap:anywhere}
+.debug-events code{display:block;color:var(--studio-muted);font:8px/1.7 ui-monospace,monospace;overflow-wrap:anywhere;margin-top:5px}
+.debug-io p{font-size:10px;color:var(--studio-muted);line-height:1.8}.debug-io details{padding:13px 0;border-bottom:1px solid var(--studio-rule)}
+.debug-io summary{font-size:11px;cursor:pointer}
+.project-inspector-content pre{max-width:100%;max-height:340px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--studio-surface);border:1px solid var(--studio-rule);padding:10px;border-radius:4px;font:10px/1.7 ui-monospace,monospace;color:var(--studio-ink);margin:12px 0 0}
+.project-inspector-content .artifact-markdown{font-size:11px;line-height:1.8;max-height:340px;overflow:auto}
+.flow-resume{padding:16px 23px;border-top:1px solid var(--studio-rule);display:flex;flex-wrap:wrap;gap:12px;align-items:end;background:var(--studio-surface)}
+.flow-resume p{flex-basis:100%;font-size:11px!important;margin:0!important;line-height:1.7;color:var(--studio-muted)!important}
+.flow-resume label{font-size:10px!important;display:flex;flex-direction:column;gap:5px!important}
+.flow-resume select{background:var(--studio-paper);border:1px solid var(--studio-rule);color:var(--studio-ink);padding:7px;border-radius:4px;font-size:11px}
+.flow-resume button{font-size:11px!important;padding:8px 12px!important}
+/* Density changes spacing in the real project views, not only legacy cards. */
+.ophi-studio.v5-compact .v5-center{padding-top:18px;gap:12px}
+.ophi-studio.v5-compact .v5-console-head{padding-bottom:11px}
+.ophi-studio.v5-compact .v5-console-heading h1{font-size:23px}
+.ophi-studio.v5-compact .project-console-permission{padding:9px 12px}
+.ophi-studio.v5-compact .project-file{padding:3px 0}
+.ophi-studio.v5-compact .project-chat-thread{gap:14px;padding:12px 0}
+.ophi-studio.v5-compact .project-chat-thread .user .project-message{padding:8px 12px}
+.ophi-studio.v5-compact .flow-ledger-head{padding:13px 18px}
+.ophi-studio.v5-compact .flow-stations{padding:15px 18px}
+.ophi-studio.v5-compact .flow-stations strong{margin-top:7px}
+.ophi-studio.v5-compact .flow-current{padding:9px 18px}
+.ophi-studio.v5-compact .flow-ledger footer{padding:8px 18px}
+.ophi-studio.v5-compact .v5-composer{padding:11px 15px;margin-top:14px}
+.ophi-studio.v5-compact .v5-composer textarea{min-height:38px}
+.ophi-studio.v5-compact .debug-summary dl>div{padding:7px 0}
+.ophi-studio.v5-compact .project-engineering-inspector{padding:16px 13px!important}
+.ophi-studio.v5-comfortable .flow-ledger-head{padding:23px}
+.ophi-studio.v5-comfortable .project-message .artifact-markdown p{font-size:13px;line-height:1.9}
+@media(max-width:760px){.flow-resume{padding:13px 16px}.flow-resume button{width:100%}.project-engineering-inspector{width:min(360px,calc(100% - 12px))!important}.ophi-studio.v5-compact .flow-stations{gap:14px 8px}}
+
+.flow-engineering-hint{padding:11px 23px 0;margin:0!important;font-size:10px!important;color:var(--studio-muted)!important}.flow-engineering-hint+.flow-stations{padding-top:16px}.flow-inspect{padding:6px!important}.debug-summary .debug-artifact .artifact-markdown{color:var(--studio-ink)}

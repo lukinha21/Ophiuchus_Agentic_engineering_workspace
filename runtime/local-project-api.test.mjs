@@ -26,10 +26,8 @@ test('local project HTTP grant, search, read, revocation and origin checks',asyn
  assert.equal((await request(`/projects/${id}/task`,{goal:'inspect',mode:'analyse',binding:{providerId:'google',modelId:'test'},confirmSend:false})).status,400);
  assert.equal((await request(`/projects/${id}/flows`,{goal:'inspect',confirmSend:false})).status,400);
  const flowBindings=Object.fromEntries(['orchestrator','architect','developer','reviewer','qa','documentation'].map(role=>[role,{providerId:'google',modelId:'fixture'}]));
- const started=await request(`/projects/${id}/flows`,{goal:'inspect',paths:['main.mjs'],bindings:flowBindings,confirmSend:true});assert.equal(started.status,202);
- let flow;for(let i=0;i<100;i++){flow=(await request(`/projects/${id}/flows/${started.data.id}`)).data;if(flow.status==='FAILED')break;await new Promise(r=>setTimeout(r,10));}
- assert.equal(flow.status,'FAILED');assert.match(flow.error,/não configurado/);assert.equal(flow.calls,1);assert.equal((await request(`/projects/${id}/flows`)).data.length,1);
- assert.equal((await request(`/projects/${id}/flows/${started.data.id}/cancel`,{})).data.status,'FAILED');
- const other=(await request('/projects/open',{path:root,confirmRead:true})).data;assert.equal((await request(`/projects/${other.id}/flows/${started.data.id}`)).status,400);await request(`/projects/${other.id}/close`,{});
+ const started=await request(`/projects/${id}/flows`,{goal:'inspect',paths:['main.mjs'],bindings:flowBindings,confirmSend:true});assert.equal(started.status,400);assert.match(started.data.error,/provedor.*cofre/);assert.equal((await request(`/projects/${id}/flows`)).data.length,0);
+ assert.equal((await request(`/projects/${id}/flows/00000000/stages/architect`)).status,400);
+ assert.equal((await request(`/projects/${id}/flows/00000000/resume`,{confirmSend:true})).status,400);
  assert.equal((await request(`/projects/${id}/close`,{})).status,200);assert.equal((await request(`/projects/${id}/tree`)).status,400);
 });
