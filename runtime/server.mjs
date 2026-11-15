@@ -1,3 +1,4 @@
+import {prepareBrowser} from './browser-testing.mjs';
 import {pickNativeFolder} from './native-folder.mjs';
 import {createProjectService} from './local-project.mjs';
 import {googleOAuthConfig,exchangeGoogleCode} from './google-oauth.mjs';
@@ -21,8 +22,13 @@ import {createAutopilotPolicy,driveAutopilot} from './autopilot.mjs';
 const PORT=Number(process.env.OPHIUCHUS_PORT||4317);
 const DB=resolve(process.env.OPHIUCHUS_STATE_FILE||'./.ophiuchus-local/runs.json');
 let runs={};
+let browserPreparing=false;
 let folderPickerBusy=false,folderPickerController=null;
-const projects=createProjectService({onUsage:async report=>{
+const projects=createProjectService({onTest:async({draftId,projectId,workflowId,result})=>{
+ if(result.passed===null)return;
+ const run=runs[draftId]||(runs[draftId]={id:draftId,type:'project-task',projectId,workflowId,prompt:'Validação isolada do projeto',createdAt:result.at,status:'DOCUMENTED',artifacts:[],events:[]});
+ run.testResults??=[];run.testResults.push({id:randomUUID(),...result});await save();
+},onUsage:async report=>{
  runs[report.id]={id:report.id,type:'project-task',workflowId:report.workflowId||null,projectId:report.projectId,prompt:'Tarefa de projeto local',createdAt:report.at,status:'DOCUMENTED',stage:'project.'+report.mode,configSnapshot:[],history:[],events:[],artifacts:[{id:report.id+':response',stage:'project.'+report.mode,providerId:report.binding.providerId,model:report.binding.modelId,usage:report.usage,at:report.at,text:'Uso do modelo em projeto local; relatório e rascunho na sessão do projeto.',integrity:'unverified'}]};await save();
 }});
 const executing=new Set();
@@ -51,7 +57,12 @@ export const server=http.createServer(async(req,res)=>{
   if(origin && !/^http:\/\/(localhost|127\.0\.0\.1):(5173|4317)$/.test(origin))return json(res,403,{error:'Origem não autorizada'});
   const url=new URL(req.url,'http://localhost');
   if(req.method==='GET'&&url.pathname==='/health')return json(res,200,{ok:true,app:'ophiuchus'});
-  if(req.method==='GET'&&url.pathname==='/desktop/status'&&process.env.OPHIUCHUS_DESKTOP==='1')return json(res,200,{active:projects.activeCount()+executing.size+testing.size+autopiloting.size,blocking:projects.blockingCount()+executing.size+testing.size+autopiloting.size});
+  if(req.method==='GET'&&url.pathname==='/desktop/status'&&process.env.OPHIUCHUS_DESKTOP==='1')return json(res,200,{active:projects.activeCount()+executing.size+testing.size+autopiloting.size,blocking:projects.blockingCount()+executing.size+testing.size+autopiloting.size+Number(browserPreparing)});
+  if(req.method==='POST'&&url.pathname==='/testing/browser/prepare'){
+   const body=await readBody(req);if(body.confirmDownload!==true)throw Error('Autorize o download do navegador Docker');
+   if(browserPreparing)return json(res,409,{error:'Preparação já está em andamento'});browserPreparing=true;
+   try{return json(res,200,await prepareBrowser())}finally{browserPreparing=false}
+  }
   if(req.method==='GET'&&url.pathname==='/projects/picker')return json(res,200,{supported:process.platform==='win32',platform:process.platform});
   if(req.method==='POST'&&url.pathname==='/projects/picker/cancel'){folderPickerController?.abort();return json(res,200,{cancelled:true});}
   if(req.method==='POST'&&url.pathname==='/projects/pick'){
@@ -73,7 +84,7 @@ export const server=http.createServer(async(req,res)=>{
    if(req.method==='POST'&&action==='cancel')return json(res,200,await projects.cancelFlow(id,flowId));
    return json(res,405,{error:'Ação do fluxo não permitida'});
   }
-  const projectMatch=url.pathname.match(/^\/projects\/([0-9a-f-]+)(?:\/(tree|file|search|task|close|drafts)(?:\/([0-9a-f-]+)(?:\/(apply|undo|test))?)?)?$/);
+  const projectMatch=url.pathname.match(/^\/projects\/([0-9a-f-]+)(?:\/(tree|file|search|task|close|drafts)(?:\/([0-9a-f-]+)(?:\/(apply|undo|test|deliver))?)?)?$/);
   if(projectMatch){
    const [,id,action,draftId,draftAction]=projectMatch;
    if(req.method==='GET'&&!action)return json(res,200,await projects.info(id));
@@ -84,7 +95,7 @@ export const server=http.createServer(async(req,res)=>{
    if(req.method==='POST'&&action==='task')return json(res,200,await projects.task(id,await readBody(req)));
    if(action==='drafts'&&draftId){
     if(req.method==='GET'&&!draftAction)return json(res,200,await projects.draft(id,draftId));
-    if(req.method==='POST'&&['apply','undo','test'].includes(draftAction))return json(res,200,await projects[draftAction](id,draftId,await readBody(req)));
+    if(req.method==='POST'&&['apply','undo','test','deliver'].includes(draftAction))return json(res,200,await projects[draftAction](id,draftId,await readBody(req)));
    }
    return json(res,405,{error:'Ação do projeto não permitida'});
   }

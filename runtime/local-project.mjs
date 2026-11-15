@@ -6,6 +6,7 @@ import {resolve,join,relative,dirname,isAbsolute,parse,sep,extname} from 'node:p
 import {homedir} from 'node:os';
 import {randomUUID,createHash} from 'node:crypto';
 import {generateText,listProviders} from './providers.mjs';
+import {browserTests} from './browser-testing.mjs';
 import {executeDocker,dockerArgs,testFiles} from './test-runner.mjs';
 import {lineDiff} from './line-diff.mjs';
 import {createProjectWorkflows} from './project-workflow.mjs';
@@ -28,7 +29,7 @@ function ignoreRule(pattern,base){
  return {base,negate,re:new RegExp((p.includes('/')?'^':'(?:^|/)')+escaped+'(?:/|$)')};
 }
 function ignored(path,rules){let skip=false;for(const rule of rules){if(rule.base&&!path.startsWith(rule.base+'/'))continue;const local=rule.base?path.slice(rule.base.length+1):path;if(rule.re.test(local))skip=!rule.negate;}return skip;}
-export function createProjectService({storageRoot=process.env.OPHIUCHUS_PROJECTS_DIR||'./.ophiuchus-local/projects',generate=generateText,docker=executeDocker,onUsage=async()=>{},checkBindings,workflowOptions={}}={}){
+export function createProjectService({storageRoot=process.env.OPHIUCHUS_PROJECTS_DIR||'./.ophiuchus-local/projects',generate=generateText,docker=executeDocker,onUsage=async()=>{},onTest=async()=>{},checkBindings,workflowOptions={}}={}){
  const grants=new Map(),flowWrites=new Map();
  async function grant(id){const p=grants.get(id);if(!p)throw Error('Projeto fechado ou sessão expirada; autorize a pasta novamente');if(await realpath(p.root)!==p.root||(await lstat(p.root)).isSymbolicLink())throw Error('Raiz do projeto mudou');return p;}
  async function guarded(p,path,{missing=false}={}){
@@ -57,8 +58,11 @@ export function createProjectService({storageRoot=process.env.OPHIUCHUS_PROJECTS
    }
   }await walk(p.root);return {files,warnings,rules};
  }
- const testPlan=d=>{const paths=[...new Set([...d.manifest.map(f=>f.path),...d.changes.map(c=>c.path)])].map(path=>({path})),tests=testFiles(paths,{language:'javascript'});return {available:tests.length>0&&tests.length<=100,tests,reason:!tests.length?'Nenhuma suíte node:test encontrada nesta cópia. Projetos HTML/Canvas como este precisam de validação no navegador; ela ainda não é executada por este botão. As alterações e os pareceres do fluxo continuam válidos.':tests.length>100?'Esta cópia contém mais de 100 arquivos de teste. Reduza a seleção antes de executar.':null};};
- const publicDraft=d=>({id:d.id,goal:d.goal,summary:d.summary,createdAt:d.createdAt,status:d.status,testPlan:testPlan(d),changes:d.changes.map(c=>({...c,diff:lineDiff(c.before||'',c.content)})),test:d.test||null,usage:d.usage,binding:d.binding,contextPaths:d.contextPaths,workflowId:d.workflowId||null});
+ const testPlan=d=>{const paths=[...new Set([...d.manifest.map(f=>f.path),...d.changes.map(c=>c.path)])],tests=testFiles(paths.map(path=>({path})),{language:'javascript'}),html=paths.filter(p=>/\.html$/i.test(p));
+  if(tests.length)return {available:tests.length<=100,kind:'NODE_TEST',tests,reason:tests.length>100?'Mais de 100 arquivos de teste; reduza a seleção.':null};
+  if(html.length)return {available:true,kind:paths.includes('ophiuchus.browser-tests.json')?'BROWSER_ASSERTIONS':'BROWSER_SMOKE',tests:[html.includes('index.html')?'index.html':html[0]],reason:paths.includes('ophiuchus.browser-tests.json')?'Interações definidas em ophiuchus.browser-tests.json, executadas no Chromium em Docker.':'Checagem de abertura HTML/Canvas no Chromium em Docker. Não verifica todas as funções do jogo. Para testar interações, adicione ophiuchus.browser-tests.json.'};
+  return {available:false,kind:'UNSUPPORTED',tests:[],reason:'Nenhuma suíte node:test ou página HTML executável encontrada. Você pode concluir a revisão sem testes, registrando o motivo.'};};
+ const publicDraft=d=>({id:d.id,goal:d.goal,summary:d.summary,createdAt:d.createdAt,status:d.status,delivery:d.delivery||null,testPlan:testPlan(d),changes:d.changes.map(c=>({...c,diff:lineDiff(c.before||'',c.content)})),test:d.test||null,usage:d.usage,binding:d.binding,contextPaths:d.contextPaths,workflowId:d.workflowId||null});
  async function audit(p,event){p.events.push({at:new Date().toISOString(),...event});await mkdir(p.dir,{recursive:true,mode:0o700});await writeFile(join(p.dir,'session.json'),JSON.stringify({id:p.id,root:p.root,events:p.events},null,2),{mode:0o600});}
  async function openProject({path,confirmRead}){
   if(confirmRead!==true||typeof path!=='string'||!isAbsolute(path))throw Error('Informe caminho absoluto e autorize a leitura');
@@ -170,9 +174,18 @@ export function createProjectService({storageRoot=process.env.OPHIUCHUS_PROJECTS
  }
  async function testDraft(id,draftId,{confirmExecute}){
   const p=await grant(id),d=p.drafts.get(draftId);if(!d||p.busy||p.workflowId||confirmExecute!==true)throw Error('Autorize a execução isolada do rascunho');p.busy=true;
-  try{const plan=testPlan(d),tests=plan.tests;if(!plan.available){d.test={status:'NOT_RUN',passed:null,output:plan.reason,tests,at:new Date().toISOString(),scope:'ISOLATED_DRAFT'};await saveDraft(p,d);return publicDraft(d);}
-   const result=await docker(dockerArgs(d.worktree,tests),{timeoutMs:30000});d.test={...result,tests,at:new Date().toISOString(),scope:'ISOLATED_DRAFT',sourceHashes:d.changes.map(c=>({path:c.path,sha256:c.afterHash}))};await saveDraft(p,d);return publicDraft(d);
+  try{d.delivery=null;const plan=testPlan(d),tests=plan.tests;if(!plan.available){d.test={status:'NOT_RUN',passed:null,output:plan.reason,tests,at:new Date().toISOString(),scope:'ISOLATED_DRAFT'};await saveDraft(p,d);return publicDraft(d);}
+   const result=plan.kind.startsWith('BROWSER_')?await browserTests(d.worktree,tests[0],{docker}):await docker(dockerArgs(d.worktree,tests),{timeoutMs:30000});d.test={...result,tests,at:new Date().toISOString(),scope:'ISOLATED_DRAFT',sourceHashes:d.changes.map(c=>({path:c.path,sha256:c.afterHash}))};await saveDraft(p,d);await onTest({draftId:d.id,projectId:id,workflowId:d.workflowId||null,result:d.test});return publicDraft(d);
   }finally{p.busy=false;}
+ }
+ async function deliver(id,draftId,{confirmWithoutTests,reason}){
+  const p=await grant(id),d=p.drafts.get(draftId);
+  if(!d||p.busy||p.workflowId||confirmWithoutTests!==true)throw Error('Confirme explicitamente a conclusão sem testes');
+  if(d.workflowId&&workflows.get(id,d.workflowId).status!=='READY')throw Error('Aguarde os pareceres do fluxo');
+  if(typeof reason!=='string'||!reason.trim()||reason.length>1500)throw Error('Informe o motivo da ausência de validação aprovada');
+  if(d.test?.passed===true)throw Error('Esta cópia já possui validação aprovada');
+  d.delivery={status:'WITHOUT_APPROVED_TESTS',reason:reason.trim(),validation:d.test?.passed===false?'FAILED':'NOT_RUN',at:new Date().toISOString()};
+  await saveDraft(p,d);return publicDraft(d);
  }
  async function close(id){const p=await grant(id);if(p.busy||p.workflowId)throw Error('Aguarde a tarefa terminar antes de fechar o projeto');await audit(p,{type:'project.closed'});grants.delete(id);return {closed:true};}
  const workflows=createProjectWorkflows({
@@ -204,6 +217,6 @@ export function createProjectService({storageRoot=process.env.OPHIUCHUS_PROJECTS
   }
   return workflows.resume(id,flowId,request);
  }
- return {activeCount:()=>workflows.activeCount()+[...grants.values()].filter(p=>p.busy&&!p.workflowId).length,blockingCount:()=>[...grants.values()].filter(p=>p.busy&&!p.workflowId).length,cancelAll:workflows.cancelAll,open:openProject,info,list,read,search,task,draft:getDraft,apply,undo,test:testDraft,close,
+ return {activeCount:()=>workflows.activeCount()+[...grants.values()].filter(p=>p.busy&&!p.workflowId).length,blockingCount:()=>[...grants.values()].filter(p=>p.busy&&!p.workflowId).length,cancelAll:workflows.cancelAll,open:openProject,info,list,read,search,task,draft:getDraft,apply,undo,test:testDraft,deliver,close,
   startFlow:workflows.start,resumeFlow,flowDetails:async(id,flowId,stageId)=>{await grant(id);return workflows.details(id,flowId,stageId)},flow:async(id,flowId)=>{await grant(id);return workflows.get(id,flowId)},flows:async id=>{await grant(id);return workflows.list(id)},cancelFlow:async(id,flowId)=>{await grant(id);return workflows.cancel(id,flowId)}};
 }

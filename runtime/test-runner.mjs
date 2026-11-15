@@ -42,7 +42,7 @@ export async function runWorkspaceTests(id,{base,timeoutMs=20000,spawnImpl=spawn
 }
 
 /** Capture the exact Docker invocation and result, without using a shell on the host. */
-export function executeDocker(args,{spawnImpl=spawn,timeoutMs=20000}={}){
+export function executeDocker(args,{spawnImpl=spawn,timeoutMs=20000,maxTimeoutMs=120000}={}){
  return new Promise(resolvePromise=>{
   const started=performance.now();let proc,output='',truncated=false,timedOut=false,settled=false,timer;
   const finish=(result)=>{if(settled)return;settled=true;clearTimeout(timer);resolvePromise({...result,durationMs:Math.round(performance.now()-started),output:output||result.output||'',truncated,timedOut});};
@@ -52,7 +52,7 @@ export function executeDocker(args,{spawnImpl=spawn,timeoutMs=20000}={}){
   proc.stdout?.on('data',capture);proc.stderr?.on('data',capture);
   proc.on('error',error=>finish({passed:false,exitCode:null,spawnError:String(error?.message||error),output:output+'\n'+String(error?.message||error)}));
   proc.on('close',(exitCode,signal)=>finish({passed:exitCode===0&&!timedOut,exitCode,signal}));
-  timer=setTimeout(()=>{timedOut=true;proc.kill('SIGKILL');},Math.max(1000,Math.min(timeoutMs,120000)));
+  timer=setTimeout(()=>{timedOut=true;proc.kill('SIGKILL');},Math.max(1000,Math.min(timeoutMs,Math.min(maxTimeoutMs,600000))));
  });
 }
 /** Local, deterministic Docker diagnostics. A real COBOL program is compiled and run.

@@ -12,6 +12,26 @@ async function fixture(t,generate=async()=>proposal([{path:'src/sum.mjs',content
  const service=createProjectService({storageRoot:join(dir,'store'),generate,docker,onUsage});const project=await service.open({path:root,confirmRead:true});t.after(()=>rm(dir,{recursive:true,force:true}));return {dir,root,service,project};
 }
 const task=(f,extra={})=>f.service.task(f.project.id,{goal:'Corrija sum',mode:'propose',paths:['src/sum.mjs'],binding,confirmSend:true,...extra});
+test('delivery without approved tests requires consent and reason and never applies source',async t=>{
+ const f=await fixture(t),r=await task(f);
+ await assert.rejects(f.service.deliver(f.project.id,r.draft.id,{reason:'Sem Docker'}),/Confirme/);
+ await assert.rejects(f.service.deliver(f.project.id,r.draft.id,{confirmWithoutTests:true,reason:''}),/motivo/);
+ const d=await f.service.deliver(f.project.id,r.draft.id,{confirmWithoutTests:true,reason:'Docker indisponível'});
+ assert.equal(d.delivery.validation,'NOT_RUN');assert.equal(d.status,r.draft.status);assert.equal(d.changes[0].applied,false);
+ assert.match(await readFile(join(f.root,'src/sum.mjs'),'utf8'),/a-b/);
+ const persisted=JSON.parse(await readFile(join(f.dir,'store',f.project.id,'drafts',d.id,'draft.json'),'utf8'));assert.equal(persisted.delivery.reason,'Docker indisponível');
+});
+test('delivery preserves failed test evidence and rejects omission after successful tests',async t=>{
+ let passed=false;const f=await fixture(t,undefined,async()=>({passed,output:'test result',exitCode:passed?0:1})),r=await task(f);
+ await f.service.test(f.project.id,r.draft.id,{confirmExecute:true});const d=await f.service.deliver(f.project.id,r.draft.id,{confirmWithoutTests:true,reason:'Falha conhecida para revisão'});
+ assert.equal(d.delivery.validation,'FAILED');assert.equal(d.test.passed,false);
+ passed=true;await f.service.test(f.project.id,r.draft.id,{confirmExecute:true});await assert.rejects(f.service.deliver(f.project.id,r.draft.id,{confirmWithoutTests:true,reason:'Pular'}),/já possui/);
+});
+test('HTML proposals select browser validation and report missing runtime without a false failure',async t=>{
+ const calls=[];const f=await fixture(t,async()=>proposal([{path:'index.html',content:'<!doctype html><canvas width="200" height="200"></canvas>'}]),async args=>{calls.push(args);return {passed:false,output:'missing image'}});
+ await rm(join(f.root,'tests/sum.test.mjs'));const r=await task(f);assert.equal(r.draft.testPlan.kind,'BROWSER_SMOKE');assert.equal(r.draft.testPlan.available,true);
+ const d=await f.service.test(f.project.id,r.draft.id,{confirmExecute:true});assert.equal(d.test.status,'NOT_RUN');assert.equal(d.test.needsPreparation,true);assert.equal(d.test.passed,null);assert.equal(calls.length,1);
+});
 test('path policy rejects traversal, absolute paths, symlinks destinations and secret conventions',()=>{
  for(const p of ['../a.js','/tmp/a.js','C:/a.js','src\\a.js','node_modules/a.js','NODE_MODULES/a.js','.env','src/credentials.json','secrets/config.json','src/a.pem','src/CON.js','src./a.js'])assert.throws(()=>projectPath(p),p);
  assert.equal(projectPath('src/ação.mjs'),'src/ação.mjs');

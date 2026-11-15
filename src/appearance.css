@@ -41,3 +41,8 @@
 .ophi-studio .project-console-permission{background:var(--studio-surface);border-color:var(--studio-rule)}
 .project-task-modes label{display:grid;gap:8px;flex:1 1 240px;min-width:0;max-width:100%}.project-task-modes select{width:100%;min-width:0;max-width:100%;text-overflow:ellipsis}
 @media(max-width:600px){.theme-picker{grid-template-columns:1fr}.ophi-studio .v5-tabs button{font-size:0!important}.ophi-studio .v5-center{padding-left:16px;padding-right:16px}}
+
+/* The old panel class also names the root engineering mode. */
+.ophi-studio.v5-engineering{max-width:none!important;width:100%;margin:0!important;padding:0!important;border:0!important;border-radius:0!important}
+.project-test-unavailable{padding:14px;border:1px solid var(--border);border-radius:8px}
+.project-tests textarea{display:block;width:100%;min-height:70px;margin:12px 0;padding:10px;font:inherit}
