@@ -1,3 +1,4 @@
+import {driveSequence} from './run-sequence.mjs';
 import {prepareBrowser} from './browser-testing.mjs';
 import {pickNativeFolder} from './native-folder.mjs';
 import {createProjectService} from './local-project.mjs';
@@ -35,6 +36,10 @@ const executing=new Set();
 const testing=new Set();
 const autopiloting=new Set();
 const autoStops=new Set();
+function scheduleSequence(run){
+ if(executing.has(run.id)||testing.has(run.id)||autopiloting.has(run.id))throw Error('Operação já em andamento');
+ executing.add(run.id);void driveSequence(run,{persist:save}).catch(()=>{}).finally(()=>executing.delete(run.id));
+}
 const BINDINGS=resolve(process.env.OPHIUCHUS_BINDINGS_FILE||'./.ophiuchus-local/bindings.json');
 let bindings={};
 const OPTIONS=resolve(process.env.OPHIUCHUS_OPTIONS_FILE||'./.ophiuchus-local/options.json');
@@ -44,7 +49,7 @@ const saveOptions=async()=>{await mkdir(dirname(OPTIONS),{recursive:true});await
 try{bindings=JSON.parse(await readFile(BINDINGS,'utf8'));}catch(e){if(e.code!=='ENOENT')throw e;}
 const saveBindings=async()=>{await mkdir(dirname(BINDINGS),{recursive:true});await writeFile(BINDINGS,JSON.stringify(bindings,null,2),{mode:0o600});};
 try{runs=JSON.parse(await readFile(DB,'utf8'));}catch(e){if(e.code!=='ENOENT')throw e;}
-for(const run of Object.values(runs)){if(run.autoPilot?.status==='RUNNING'){run.autoPilot.status='PAUSED';run.autoPilot.lastError='Servidor reiniciado; reinicie a automação com autorização';}}
+for(const run of Object.values(runs)){if(run.sequence?.status==='RUNNING'){run.sequence.status='PAUSED';run.sequence.error='Aplicativo reiniciado; autorize a retomada para continuar.';}if(run.autoPilot?.status==='RUNNING'){run.autoPilot.status='PAUSED';run.autoPilot.lastError='Servidor reiniciado; reinicie a automação com autorização';}}
 let saving=Promise.resolve();
 const save=()=>{const snapshot=JSON.stringify(runs,null,2);const pending=saving.catch(()=>{}).then(async()=>{await mkdir(dirname(DB),{recursive:true});const temporary=DB+'.'+randomUUID()+'.tmp';await writeFile(temporary,snapshot,{mode:0o600});await rename(temporary,DB);});saving=pending;return pending;};
 const json=(res,code,value)=>{res.writeHead(code,{'content-type':'application/json; charset=utf-8','cache-control':'no-store'});res.end(JSON.stringify(value));};
@@ -134,7 +139,7 @@ export const server=http.createServer(async(req,res)=>{
   if(req.method==='GET'&&url.pathname==='/metrics'){const days=Number(url.searchParams.get('days')||7);if(![1,7,30].includes(days))return json(res,400,{error:'Período inválido'});return json(res,200,summarizeMetrics(runs,days));}
   if(req.method==='GET'&&url.pathname==='/runs')return json(res,200,Object.values(runs).map(r=>({id:r.id,status:r.status,stage:r.stage,createdAt:r.createdAt})));
   if(req.method==='POST'&&url.pathname==='/runs'){
-   const body=await readBody(req);const run=startRun(createRun({id:randomUUID(),prompt:body.prompt,agents:body.agents}));run.executionOptions={...executionOptions};runs[run.id]=run;await save();return json(res,201,run);
+   const body=await readBody(req);const run=startRun(createRun({id:randomUUID(),prompt:body.prompt,agents:body.agents}));run.executionOptions={...executionOptions};runs[run.id]=run;run.sequence=body.confirmSend===true?{enabled:true,status:'PENDING',calls:0,steps:0,error:null}:undefined;await save();if(run.sequence?.enabled)scheduleSequence(run);return json(res,201,run);
   }
   const autoMatch=url.pathname.match(/^\/runs\/([\w-]+)\/autopilot\/(start|stop)$/);
   if(autoMatch){
@@ -205,13 +210,14 @@ export const server=http.createServer(async(req,res)=>{
    }
    return json(res,405,{error:'Método não permitido'});
   }
-  const match=url.pathname.match(/^\/runs\/([\w-]+)(?:\/(complete|approve|failure|cancel|events|execute|discard-draft))?$/);
+  const match=url.pathname.match(/^\/runs\/([\w-]+)(?:\/(complete|approve|failure|cancel|events|execute|continue|discard-draft))?$/);
   if(!match)return json(res,404,{error:'Rota não encontrada'});
   const run=runs[match[1]];if(!run)return json(res,404,{error:'Run não encontrado'});
   if(req.method==='GET'&&match[2]==='events')return json(res,200,run.events);
   if(req.method==='GET'&&!match[2])return json(res,200,run);
   if(req.method!=='POST')return json(res,405,{error:'Método não permitido'});
   const body=await readBody(req);
+  if(match[2]==='continue'){if(body.confirmSend!==true)throw Error('Autorize a retomada da equipe');if(run.status!=='RUNNING')throw Error('Esta execução não pode ser retomada');scheduleSequence(run);return json(res,202,run);}
   if(match[2]==='execute'){
    if(executing.has(run.id)||testing.has(run.id)||autopiloting.has(run.id))return json(res,409,{error:'Uma operação já está sendo executada'});
    executing.add(run.id);
@@ -228,7 +234,7 @@ export const server=http.createServer(async(req,res)=>{
    case 'cancel':cancel(run);break;
    default:return json(res,404,{error:'Ação não encontrada'});
   }
-  await save();return json(res,200,run);
+  await save();if(match[2]==='approve'&&body.accepted===true&&run.sequence?.enabled&&run.status==='RUNNING')scheduleSequence(run);return json(res,200,run);
  }catch(error){json(res,400,{error:error.message});}
 });
 server.listen(PORT,'127.0.0.1',()=>console.log(`Ophiuchus control-plane: http://127.0.0.1:${PORT}`));

@@ -1,0 +1,12 @@
+import ProjectFlow from './ProjectFlow'
+import type {ProjectFlowState} from './ProjectFlow'
+import type {RuntimeRun} from './runtimeClient'
+const groups=[['orchestrator','Direção','Orquestrador',['discovery'],'task-001'],['architect','Estrutura','Arquiteto',['specification','architecture'],'task-002'],['developer','Implementação','Desenvolvedor',['implementation'],'task-004'],['reviewer','Revisão','Revisor',['review'],'task-005'],['qa','Critérios','QA',['qa'],'task-006'],['documentation','Entrega','Documentação',['delivery'],'task-006']] as const
+export default function RuntimeFlow({run,engineering,onInspect,onCancel}:{run:RuntimeRun;engineering:boolean;onInspect:(id:string)=>void;onCancel:()=>void}){
+ const active=groups.find(g=>(g[3] as readonly string[]).includes(run.stage))||groups[0]
+ const flow:ProjectFlowState={id:run.id,projectId:'',goal:run.prompt,status:run.status==='SUCCESS'?'READY':run.status==='BLOCKED'?'BLOCKED':run.status==='CANCELLED'?'CANCELLED':run.status==='WAITING_APPROVAL'?'WAITING_APPROVAL':run.sequence?.status==='PAUSED'?'FAILED':'RUNNING',stage:active[0],calls:run.sequence?.calls||run.artifacts?.filter(a=>a.providerId!=='local').length||0,maxCalls:18,events:run.events.map((e,i)=>({...e,seq:i+1,message:e.summary||e.reason||e.type})),contextPaths:[],draftId:null,summary:'',error:run.sequence?.error||null,validation:run.deliveryValidation?.level||'NOT_EXECUTED',bindings:Object.fromEntries(groups.map(g=>{const a=run.configSnapshot.find(a=>a.role.toLowerCase()===g[0]);return [g[0],{providerId:a?.modelBinding.providerId||'',modelId:a?.modelBinding.modelId||''}]})),stages:groups.map(g=>{
+ const texts=(run.artifacts||[]).filter(a=>(g[3] as readonly string[]).includes(a.stage));const done=g[3].every(stage=>run.history.includes(stage));
+ return {id:g[0],name:g[2],label:g[1],status:done?'COMPLETED':active===g?run.status==='CANCELLED'?'CANCELLED':run.sequence?.status==='PAUSED'?'FAILED':'RUNNING':'QUEUED',text:texts.map(a=>a.text).join('\n\n'),detail:done?'Concluído':active===g&&run.status==='WAITING_APPROVAL'?'Aguardando sua validação':'',startedAt:null,endedAt:null}
+ })};
+ return <ProjectFlow flow={flow} engineering={engineering} onCancel={onCancel} onInspect={id=>onInspect(groups.find(g=>g[0]===id)?.[4]||'task-001')} contextLabel="Pedido sem arquivos anexados" completionLabel={run.deliveryValidation?.level==='DOCKER_VERIFIED'?'Testes Docker aprovados':'Revisão estática · consulte Testes para validar'}/>
+}

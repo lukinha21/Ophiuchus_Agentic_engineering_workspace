@@ -147,3 +147,15 @@
 .ophi-studio .workspace-empty{padding:16px;color:var(--studio-muted)!important;line-height:1.7}.ophi-studio .workspace-file-catalog>p{color:var(--studio-muted)!important}.ophi-studio .workspace-file-catalog>button{display:flex;align-items:center;gap:10px;width:100%;padding:12px;border:1px solid var(--studio-rule);border-radius:8px;background:var(--studio-paper);color:var(--studio-ink);margin:7px 0;text-align:left}.ophi-studio .workspace-file-catalog>button span{flex:1;overflow-wrap:anywhere}
 .ophi-studio .workspace-area :is(.project-change,.project-preview,.project-diff){background:var(--studio-paper)!important;color:var(--studio-ink)!important;border-color:var(--studio-rule)!important}.ophi-studio .workspace-area .diff-add{background:var(--studio-success-bg);color:var(--studio-success)}.ophi-studio .workspace-area .diff-remove{background:var(--studio-danger-bg);color:var(--studio-alert)}
 @media(max-width:760px){.ophi-studio .v5-console-tools:has(.workspace-new-chat){display:flex!important}.ophi-studio .v5-console-tools:has(.workspace-new-chat)>.v5-demo-pill{display:none}.ophi-studio .v5-console-head{flex-wrap:wrap}.ophi-studio .workspace-area>header,.ophi-studio .workspace-area-content{padding:15px}.ophi-studio .workspace-area-tabs{padding:6px;gap:2px}.ophi-studio .workspace-area-tabs button{flex:1;padding:9px 7px;gap:5px}.ophi-studio .workspace-history-stage summary span{float:none;display:block;margin:3px 0}}
+
+/* Both workspaces use the shared area header; legacy explorer chrome is redundant. */
+.ophi-studio .workspace-area .ow-header .ow-title{display:none}
+.ophi-studio .workspace-area .ow-header{justify-content:flex-end;padding-bottom:8px}
+.ophi-studio .flow-ledger .flow-stations li::before{display:none!important}
+.ophi-studio .flow-ledger .station-marker{box-shadow:none!important}
+.ophi-studio .flow-ledger .flow-model{background:transparent!important;padding:0;border:0}
+.ophi-studio .ophi-workspace-toggle{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0}
+.ophi-studio .ophi-workspace-toggle>button{display:inline-flex;align-items:center;gap:8px}
+.ophi-studio .legacy-console-flow>.v5-conversation{margin-bottom:18px}
+.ophi-studio .legacy-console-flow .project-message{max-width:min(700px,85%);padding:16px 20px;background:var(--studio-soft);border:1px solid var(--studio-rule);border-radius:10px;color:var(--studio-ink);overflow-wrap:anywhere}
+.ophi-studio .legacy-console-flow .project-message p{margin:8px 0 0}
