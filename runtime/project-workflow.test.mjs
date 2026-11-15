@@ -84,9 +84,9 @@ test('truncated architect can resume once with a larger bounded output without r
  let attempts=0;const f=await fixture(t,async a=>a.model==='architect'&&++attempts===1?{text:'partial',finishReason:'length',usage:{total_tokens:4096}}:answer(a.model));
  const id=(await f.start()).id,first=await done(f,id);
  assert.equal(first.status,'FAILED');assert.equal(first.errorInfo.code,'MODEL_OUTPUT_LIMIT');assert.equal(first.canResume,true);assert.equal(first.calls,2);assert.equal(first.draftId,null);
- assert.equal(f.calls[1].maxOutputTokens,4096);
+ assert.equal(f.calls[1].maxOutputTokens,8192);
  await f.service.resumeFlow(f.project.id,id,{confirmSend:true});const flow=await done(f,id);
- assert.equal(flow.status,'READY');assert.equal(flow.calls,7);assert.equal(f.calls[2].maxOutputTokens,8192);assert.match(f.calls[2].messages[0].content,/não continue o texto parcial/);assert.equal(f.calls.filter(a=>a.model==='orchestrator').length,1);assert.equal(flow.stages[1].attempts.length,2);
+ assert.equal(flow.status,'READY');assert.equal(flow.calls,7);assert.equal(f.calls[2].maxOutputTokens,16384);assert.match(f.calls[2].messages[0].content,/não continue o texto parcial/);assert.equal(f.calls.filter(a=>a.model==='orchestrator').length,1);assert.equal(flow.stages[1].attempts.length,2);
 });
 test('repeated truncation stops after the authorized attempt',async t=>{
  const f=await fixture(t,async a=>a.model==='architect'?{text:'partial',finishReason:'length'}:answer(a.model));const id=(await f.start()).id;await done(f,id);await f.service.resumeFlow(f.project.id,id,{confirmSend:true});const flow=await done(f,id);assert.equal(flow.canResume,false);assert.equal(flow.calls,3);assert.equal(flow.draftId,null);
