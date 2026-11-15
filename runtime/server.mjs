@@ -8,6 +8,7 @@ import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
 import {resolve,dirname} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {createRun,startRun,completeStage,approve,reportFailure,cancel} from './orchestrator.mjs';
+import {capabilities} from './model-capabilities.mjs';
 import {listProviders,listModels} from './providers.mjs';
 import {vaultStatus,unlockVault,lockVault,saveCredential,removeCredential,saveCustomEndpoint} from './vault.mjs';
 import {executeStage} from './executor.mjs';
@@ -86,6 +87,7 @@ const server=http.createServer(async(req,res)=>{
    return json(res,405,{error:'Ação do projeto não permitida'});
   }
   if(req.method==='GET'&&url.pathname==='/health')return json(res,200,{ok:true,service:'ophiuchus-control-plane',providerExecution:true});
+  if(req.method==='GET'&&url.pathname==='/capabilities')return json(res,200,capabilities(url.searchParams.get('provider'),url.searchParams.get('model')||''));
   if(req.method==='GET'&&url.pathname==='/providers')return json(res,200,listProviders());
   if(req.method==='GET'&&url.pathname==='/vault')return json(res,200,await vaultStatus());
   if(req.method==='POST'&&url.pathname==='/vault/unlock'){const body=await readBody(req);return json(res,200,await unlockVault(body.password));}

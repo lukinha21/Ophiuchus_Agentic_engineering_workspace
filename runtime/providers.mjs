@@ -1,3 +1,4 @@
+import {rememberCapabilities,requestMode,portableSchema} from './model-capabilities.mjs';
 import {googleAccessToken} from './google-oauth.mjs';
 /** Provider adapters; secrets remain in the backend. */
 import {getCredential,getCustomEndpoint} from './vault.mjs';
@@ -30,14 +31,16 @@ export async function listModels(id,{env=process.env,fetchImpl=fetch,signal}={})
  const googleToken=id==='google'?await googleAccessToken(env,fetchImpl):null;const requestHeaders=googleToken?{Authorization:`Bearer ${googleToken}`} : headers(p);
  const response=await fetchImpl(p.baseUrl+path,{headers:requestHeaders,signal});await checkResponse(response,p.name);
  const json=await response.json();const models=p.kind==='gemini'?json.models:json.data;
- if(!Array.isArray(models))throw Error('Catálogo inválido');
+ if(!Array.isArray(models))throw Error('Catálogo inválido');rememberCapabilities(id,models);
  return models.filter(m=>typeof m.name==='string'||typeof m.id==='string').filter(m=>p.kind!=='gemini'||m.supportedGenerationMethods?.includes('generateContent')).map(m=>({id:p.kind==='gemini'?m.name.replace(/^models\//,''):m.id,providerId:id,label:m.displayName||m.name||m.id})).sort((a,b)=>a.id.localeCompare(b.id));
 }
 function normalizeMessages(messages){return messages.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:String(m.content)}]}));}
-export async function generateText({providerId,model,messages,maxOutputTokens=600,allowEmptyTruncated=false},{env=process.env,fetchImpl=fetch,signal}={}){
+export async function generateText({providerId,model,messages,maxOutputTokens=600,allowEmptyTruncated=false,responseContract,policy={}},{env=process.env,fetchImpl=fetch,signal}={}){
  const p=resolveProvider(providerId,env);if(!p.configured)throw Error('Provedor não configurado no servidor');
  if(typeof model!=='string'||!model.trim()||!Array.isArray(messages)||!messages.length)throw Error('Modelo e mensagens obrigatórios');
  if(!Number.isInteger(maxOutputTokens)||maxOutputTokens<1||maxOutputTokens>16384)throw Error('Limite de saída inválido');
+ const execution=requestMode(providerId,model,responseContract,policy);if(execution.outputLimit)maxOutputTokens=Math.min(maxOutputTokens,execution.outputLimit);
+ const schema=responseContract?portableSchema(responseContract.schema):null;
  let url,body;
  if(p.kind==='gemini'){
   if(!/^[a-zA-Z0-9._-]{1,128}$/.test(model))throw Error('Modelo Gemini inválido');
@@ -45,9 +48,12 @@ export async function generateText({providerId,model,messages,maxOutputTokens=60
   url=`${p.baseUrl}/models/${model}:generateContent`;
   body={contents:normalizeMessages(messages.filter(m=>m.role!=='system')),generationConfig:{maxOutputTokens}};
   if(system)body.systemInstruction={parts:[{text:system}]};
+  if(schema&&execution.formatMode==='gemini'){body.generationConfig.responseMimeType='application/json';body.generationConfig.responseJsonSchema=schema;}
  }else if(p.kind==='anthropic'){
   url=p.baseUrl+'/messages';body={model,max_tokens:maxOutputTokens,messages:messages.filter(m=>m.role!=='system').map(m=>({role:m.role,content:m.content})),system:messages.filter(m=>m.role==='system').map(m=>m.content).join('\n')};
- }else{url=p.baseUrl+'/chat/completions';body={model,messages,max_tokens:maxOutputTokens};}
+  if(schema&&execution.formatMode==='anthropic')body.output_config={format:{type:'json_schema',schema}};
+  if(execution.cacheMode==='explicit-opt-in'){const source=body.messages.find(m=>m.role==='user'&&m.content.length>=8192);if(source)source.content=[{type:'text',text:source.content,cache_control:{type:'ephemeral'}}];else execution.cacheMode='not-requested-short-prefix';}
+ }else{url=p.baseUrl+'/chat/completions';body={model,messages,[execution.outputParameter]:maxOutputTokens};if(schema&&execution.formatMode==='openai')body.response_format={type:'json_schema',json_schema:{name:responseContract.name,strict:true,schema}};}
  const googleToken=providerId==='google'?await googleAccessToken(env,fetchImpl):null;const requestHeaders=googleToken?{Authorization:`Bearer ${googleToken}`} : headers(p);
  const response=await fetchImpl(url,{method:'POST',headers:{...requestHeaders,'Content-Type':'application/json'},body:JSON.stringify(body),signal});await checkResponse(response,p.name);
  const json=await response.json();let text='',finishReason=null,usage=null;
@@ -57,12 +63,12 @@ export async function generateText({providerId,model,messages,maxOutputTokens=60
   const u=json.usageMetadata||{};usage={prompt_tokens:u.promptTokenCount||0,completion_tokens:u.candidatesTokenCount||0,total_tokens:u.totalTokenCount||0,thinking_tokens:u.thoughtsTokenCount||0,cached_input_tokens:u.cachedContentTokenCount||0};
  }else if(p.kind==='anthropic'){
   text=(json.content||[]).filter(x=>x.type==='text').map(x=>x.text).join('\n');finishReason=json.stop_reason==='max_tokens'?'length':json.stop_reason==='end_turn'?'stop':json.stop_reason||null;
-  usage={prompt_tokens:json.usage?.input_tokens||0,completion_tokens:json.usage?.output_tokens||0,total_tokens:(json.usage?.input_tokens||0)+(json.usage?.output_tokens||0)};
+  const u=json.usage||{},cached=u.cache_read_input_tokens||0,written=u.cache_creation_input_tokens||0;usage={prompt_tokens:(u.input_tokens||0)+cached+written,completion_tokens:u.output_tokens||0,total_tokens:(u.input_tokens||0)+cached+written+(u.output_tokens||0),cached_input_tokens:cached,cache_write_tokens:written};
  }else{
   const choice=json.choices?.[0];const content=choice?.message?.content;
   text=typeof content==='string'?content:Array.isArray(content)?content.filter(x=>x?.type==='text').map(x=>x.text||'').join('\n'):'';
-  finishReason=choice?.finish_reason??null;usage=json.usage??null;
+  finishReason=choice?.finish_reason??null;usage=json.usage?{...json.usage,cached_input_tokens:json.usage.prompt_tokens_details?.cached_tokens??0,thinking_tokens:json.usage.completion_tokens_details?.reasoning_tokens??0}:null;
  }
  if(!text.trim()&&!(allowEmptyTruncated&&finishReason==='length'))throw Error(`O modelo retornou texto vazio (finish_reason: ${finishReason||'não informado'}). Experimente outro modelo ou aumente o limite de saída.`);
- return {providerId,model,text,usage,finishReason};
+ return {providerId,model,text,usage,finishReason,execution};
 }

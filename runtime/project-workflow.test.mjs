@@ -6,7 +6,7 @@ import {tmpdir} from 'node:os';
 import {createProjectService} from './local-project.mjs';
 import {PROJECT_STAGES} from './project-workflow.mjs';
 const bindings=Object.fromEntries(PROJECT_STAGES.map(s=>[s.id,{providerId:'google',modelId:s.id}]));
-function answer(role){return {text:role==='developer'?JSON.stringify({summary:'Corrige soma',changes:[{path:'sum.mjs',edits:[{oldText:'a-b',newText:'a+b'}]}]}):['reviewer','qa'].includes(role)?JSON.stringify({verdict:'pass',summary:'Mudança coerente',evidence:'sum.mjs: soma os dois argumentos; parecer estático'}):role+': objetivo e critérios deste pedido',finishReason:'stop',usage:{total_tokens:10}};}
+function answer(role){return {text:role==='developer'?JSON.stringify({summary:'Corrige soma',changes:[{path:'sum.mjs',edits:[{oldText:'a-b',newText:'a+b'}],reason:'Corrigir soma'}]}):['reviewer','qa'].includes(role)?JSON.stringify({verdict:'pass',summary:'Mudança coerente',evidence:'sum.mjs: soma os dois argumentos; parecer estático'}):JSON.stringify(role==='orchestrator'?{summary:role+': objetivo e critérios deste pedido',scope:['Corrigir soma'],criteria:['Somar argumentos'],files:['sum.mjs']}:role==='architect'?{summary:role+': objetivo e critérios deste pedido',decisions:['Preservar export'],risks:[]}:{summary:'Correção documentada',changes:['sum.mjs: soma correta'],limitations:['Sem testes executados'],checks:['Executar teste']}),finishReason:'stop',usage:{total_tokens:10}};}
 async function fixture(t,generate,options={}){
  const dir=await mkdtemp(join(tmpdir(),'ophi-flow-')),root=join(dir,'repo');await mkdir(root);await writeFile(join(root,'sum.mjs'),'export const sum=(a,b)=>a-b;');
  const calls=[],usage=[];let dockerCalls=0;
@@ -18,7 +18,7 @@ async function done(f,id){for(let i=0;i<400;i++){const flow=await f.service.flow
 test('six agents hand off real artifacts, isolate proposal and require explicit write',async t=>{
  const f=await fixture(t),started=await f.start(),flow=await done(f,started.id);
  assert.equal(flow.status,'READY');assert.deepEqual(f.calls.map(c=>c.model),PROJECT_STAGES.map(s=>s.id));assert.equal(flow.calls,6);assert.equal(flow.validation,'STATIC_ONLY');assert.equal(f.dockerCalls,0);
- assert.ok(f.calls[1].messages[1].content.includes('orchestrator: objetivo'));assert.ok(f.calls[2].messages[1].content.includes('architect: objetivo'));assert.ok(f.calls[3].messages[1].content.includes('a+b'));assert.ok(f.calls[3].messages[1].content.includes('a-b'));
+ assert.ok(f.calls[1].messages.some(m=>m.content.includes('orchestrator: objetivo')));assert.ok(f.calls[2].messages[1].content.includes('architect: objetivo'));assert.ok(f.calls[3].messages[1].content.includes('a+b'));assert.ok(f.calls[3].messages[1].content.includes('a-b'));
  assert.equal(f.usage.length,6);assert.equal(new Set(f.usage.map(u=>u.id)).size,6);assert.equal(await readFile(join(f.root,'sum.mjs'),'utf8'),'export const sum=(a,b)=>a-b;');
  await assert.rejects(f.service.apply(f.project.id,flow.draftId,{path:'sum.mjs',confirmWrite:false}),/Aprovação/);
  await f.service.apply(f.project.id,flow.draftId,{path:'sum.mjs',confirmWrite:true});assert.match(await readFile(join(f.root,'sum.mjs'),'utf8'),/a\+b/);
@@ -78,6 +78,14 @@ test('diagnostic payload is fetched explicitly, preserves real prompts and does 
 
 test('missing credentials fail preflight without registering a flow or dispatching a model',async t=>{
  const f=await fixture(t,undefined,{checkBindings:async()=>{throw Error('Desbloqueie o cofre')}});await assert.rejects(f.start(),/cofre/);assert.equal(f.calls.length,0);assert.equal((await f.service.flows(f.project.id)).length,0);
+});
+
+test('invalid planning contracts stop after one call, without paid repair or source writes',async t=>{
+ const f=await fixture(t,async()=>({text:'Um plano em prosa sem contrato',finishReason:'stop',usage:{total_tokens:10}}));const flow=await done(f,(await f.start()).id);assert.equal(flow.errorInfo.code,'INVALID_HANDOFF');assert.equal(flow.calls,1);assert.equal(flow.canResume,false);assert.equal(flow.draftId,null);
+});
+
+test('policy snapshots inherit common settings and preserve per-agent model bindings',async t=>{
+ const f=await fixture(t);const policy={format:'auto',cache:'explicit',agents:{qa:{format:'prompt'}}};const id=(await f.start({policy})).id;policy.agents.qa.format='auto';const flow=await done(f,id);assert.equal(flow.status,'READY');assert.equal(flow.policy.agents.qa.format,'prompt');assert.equal(f.calls.find(c=>c.model==='qa').policy.cache,'explicit');assert.equal(f.calls.find(c=>c.model==='qa').policy.format,'prompt');assert.equal(flow.bindings.qa.modelId,'qa');assert.equal(flow.events.filter(e=>e.type==='handoff.validated').length,6);
 });
 
 test('truncated architect can resume once with a larger bounded output without repeating the plan',async t=>{
