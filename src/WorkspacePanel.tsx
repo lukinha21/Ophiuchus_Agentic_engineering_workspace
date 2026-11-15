@@ -4,7 +4,7 @@ import './workspace-files.css'
 import {FolderOpen, FileCode2, FilePlus2, RefreshCw, Eye, Pencil, GitCompareArrows, Play, ShieldCheck, CheckCircle2, XCircle, Terminal, Save, X, AlertTriangle, Files, ChevronRight} from 'lucide-react'
 type Proposal={path:string;content:string}
 type Saved={path:string;bytes:number}
-export default function WorkspacePanel({runId,artifactCount}:{runId:string;artifactCount:number}){
+export default function WorkspacePanel({runId,artifactCount,section}:{runId:string;artifactCount:number;section?:'files'|'tests'}){
  const [proposals,setProposals]=useState<Proposal[]>([])
  const [artifactId,setArtifactId]=useState<string|null>(null)
  const [files,setFiles]=useState<Saved[]>([])
@@ -15,7 +15,8 @@ export default function WorkspacePanel({runId,artifactCount}:{runId:string;artif
  const [diff,setDiff]=useState<{path:string;exists:boolean;before:string;after:string;changed:boolean;tooLarge?:boolean;lines?:{kind:'same'|'add'|'remove';text:string}[]}|null>(null)
  const [testResult,setTestResult]=useState<{passed:boolean;output:string;timedOut:boolean;tests:string[]}|null>(null)
  const [confirmTests,setConfirmTests]=useState(false)
- const [tab,setTab]=useState<'files'|'tests'>('files')
+ const [localTab,setTab]=useState<'files'|'tests'>('files')
+ const tab=section||localTab
  const [editPath,setEditPath]=useState('')
  const [editContent,setEditContent]=useState('')
  const [editConfirm,setEditConfirm]=useState(false)
@@ -34,7 +35,7 @@ export default function WorkspacePanel({runId,artifactCount}:{runId:string;artif
  const openEditor=()=>{setTab('files');setEditPath('src/isPrime.test.js');setEditContent("import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { isPrime } from './isPrime.js';\n\ntest('primos', () => {\n  assert.equal(isPrime(2), true);\n  assert.equal(isPrime(7), true);\n});\n\ntest('compostos', () => {\n  assert.equal(isPrime(4), false);\n  assert.equal(isPrime(9), false);\n});\n");setEditConfirm(false)}
  return <section className="ophi-files" aria-label="Workspace de arquivos">
   <header className="ow-header"><div className="ow-title"><span className="ow-icon"><FolderOpen size={22}/></span><div><div className="ow-eyebrow">OPHIUCHUS / WORKSPACE</div><h2>Explorador de arquivos</h2><p>Arquivos da execução, alterações propostas e validação controlada.</p></div></div><button className="ow-ghost" onClick={()=>void refresh()} disabled={busy}><RefreshCw size={15}/> Atualizar</button></header>
-  <div className="ow-toolbar"><div className="ow-tabs"><button className={tab==='files'?'active':''} onClick={()=>setTab('files')}><Files size={15}/> Arquivos <span>{files.length}</span></button><button className={tab==='tests'?'active':''} onClick={()=>setTab('tests')}><Terminal size={15}/> Testes <span>{tests.length}</span></button></div><span className="ow-safe"><ShieldCheck size={14}/> Gravação e execução com autorização</span></div>
+  {!section&&<><div className="ow-toolbar"><div className="ow-tabs"><button className={tab==='files'?'active':''} onClick={()=>setTab('files')}><Files size={15}/> Arquivos <span>{files.length}</span></button><button className={tab==='tests'?'active':''} onClick={()=>setTab('tests')}><Terminal size={15}/> Testes <span>{tests.length}</span></button></div><span className="ow-safe"><ShieldCheck size={14}/> Gravação e execução com autorização</span></div></>}
   {error&&<div className="ow-alert"><AlertTriangle size={17}/>{error}</div>}
   {tab==='files'&&<div className="ow-content">
    <div className="ow-section-head"><div><span className="ow-eyebrow">ALTERAÇÕES PENDENTES</span><h3>Propostas da implementação <span className="ow-count">{proposals.length}</span></h3></div>{selected.length>0&&<button className="ow-primary" disabled={busy} onClick={()=>void apply()}><Save size={15}/> {busy?'Gravando…':`Aplicar ${selected.length} arquivo(s)`}</button>}</div>
