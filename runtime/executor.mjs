@@ -229,7 +229,7 @@ export async function executeStage(run,{generate=generateText}={}){
    }
    artifact.fileProposals=plan.paths.map(path=>plan.accepted.find(f=>f.path===path));
    const full=validateProposals(artifact.fileProposals,run.languageContract||stackContract(run.prompt));
-   if(!full.ok){artifact.integrity='invalid';artifact.fileProposals=[];run.artifacts.push({stage,...artifact});run.pendingDraft=null;run.filePlan=null;reportFailure(run,{kind:'code',origin:'implementation',summary:full.reason});return run;}
+   if(!full.ok){artifact.integrity='invalid';artifact.fileProposals=[];run.artifacts.push({stage,...artifact});run.pendingDraft=null;emit(run,'validation.failed',{kind:'plan',summary:full.reason});run.status='BLOCKED';emit(run,'run.blocked',{reason:'Plano de arquivos incompatível com o contrato: '+full.reason+'. Arquivos preservados; nenhuma repetição automática do plano.'});return run;}
    plan.complete=true;
   }
  }

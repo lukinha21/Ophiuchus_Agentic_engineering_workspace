@@ -1,8 +1,22 @@
 import {safePath} from './workspace.mjs';
+import {stackContract} from './stack-contract.mjs';
+/** Architecture paths are hints; mandatory contract artifacts must be queued too. */
+function completePaths(paths,contract){
+ const result=[...paths];
+ if(contract.language==='java'&&!result.some(p=>/Test\.java$/.test(p))){
+  const source=result.find(p=>p.endsWith('.java'));
+  if(source)result.push(safePath(source.replace(/\.java$/,'Test.java')));
+ }
+ if(contract.language==='cobol'&&!result.some(p=>/(test|teste|spec)[^/]*\.(cob|cbl)$/i.test(p))){
+  const source=result.find(p=>/\.(cob|cbl)$/i.test(p));
+  if(source){const at=source.lastIndexOf('/');result.push(safePath(source.slice(0,at+1)+'test_'+source.slice(at+1)));}
+ }
+ return result;
+}
 /** Derive a work queue from this run's architecture, without another model call. */
 export function prepareFilePlan(run){
  if(run.filePlan?.complete)run.filePlan=null;
- if(run.filePlan)return run.filePlan;
+ if(run.filePlan){run.filePlan.paths=completePaths(run.filePlan.paths,run.languageContract||stackContract(run.prompt));return run.filePlan;}
  const architecture=[...(run.artifacts||[])].reverse().find(a=>a.stage==='architecture');
  if(!architecture)return null;
  const paths=[];
@@ -14,7 +28,7 @@ export function prepareFilePlan(run){
  const failure=[...(run.events||[])].reverse().find(e=>e.type==='validation.failed'&&e.target==='implementation');
  const targets=previous&&failure?paths.filter(p=>String(failure.summary).includes(p)):[];
  const accepted=targets.length?previous.fileProposals.filter(f=>paths.includes(f.path)&&!targets.includes(f.path)):[];
- run.filePlan={paths,accepted,complete:false,failures:{}};return run.filePlan;
+ run.filePlan={paths:completePaths(paths,run.languageContract||stackContract(run.prompt)),accepted,complete:false,failures:{}};return run.filePlan;
 }
 export function fileTaskContext(plan){
  if(!plan)return '';
