@@ -11,6 +11,8 @@ import WorkspaceArea from './WorkspaceArea'
 import type {WorkspaceView} from './WorkspaceArea'
 import type {ProjectFlowState} from './ProjectFlow'
 import ProjectInspector from './ProjectInspector'
+import {snapshotFlow} from './ChatHistory'
+import type {ChatSnapshot} from './ChatHistory'
 type Turn={id:string;role:'user'|'assistant';text:string;error?:boolean;draftId?:string;flowId?:string}
 type FileInfo={path:string;bytes:number}
 type Project={id:string;root:string;name:string;files:FileInfo[];warnings:string[];drafts?:Array<{id:string;summary:string;status:string;createdAt:string}>}
@@ -23,8 +25,8 @@ function FileTree({files,selected,onSelect,onOpen,prefix='',depth=0}:{files:File
 }
 export type ProjectHandle={submit:(goal:string)=>Promise<boolean>;openFolder:()=>Promise<boolean>}
 export type ProjectStatus={active:boolean;name:string;busy:boolean;canSend:boolean}
-type Props={agents:AgentDefinition[];onSettings:()=>void;sidebarTarget:HTMLElement|null;workTarget:HTMLElement|null;onStatus:(status:ProjectStatus)=>void;onNewChat:()=>void;engineering:boolean;inspectorTarget:HTMLElement|null;onInspect:()=>void;onCloseInspector:()=>void;disabled?:boolean}
-const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({agents,onSettings,sidebarTarget,workTarget,onStatus,onNewChat,engineering,inspectorTarget,onInspect,onCloseInspector,disabled=false},ref){
+type Props={onArchive?: (snapshot:ChatSnapshot)=>void;agents:AgentDefinition[];onSettings:()=>void;sidebarTarget:HTMLElement|null;workTarget:HTMLElement|null;onStatus:(status:ProjectStatus)=>void;onNewChat:()=>void;engineering:boolean;inspectorTarget:HTMLElement|null;onInspect:()=>void;onCloseInspector:()=>void;disabled?:boolean}
+const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({onArchive,agents,onSettings,sidebarTarget,workTarget,onStatus,onNewChat,engineering,inspectorTarget,onInspect,onCloseInspector,disabled=false},ref){
  const [workspaceView,setWorkspaceView]=useState<WorkspaceView>('files')
  const [path,setPath]=useState(''),[readAllowed,setReadAllowed]=useState(false),[project,setProject]=useState<Project|null>(null)
  const [selected,setSelected]=useState<string[]>([]),[preview,setPreview]=useState<{path:string;content:string}|null>(null)
@@ -32,6 +34,8 @@ const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({agents
  const [contractFormat,setContractFormat]=useState<'auto'|'prompt'>('auto'),[cachePolicy,setCachePolicy]=useState<'provider'|'explicit'>('provider')
  const [mode,setMode]=useState<'auto'|'orchestrate'|'analyse'|'propose'>('auto'),[sendAllowed,setSendAllowed]=useState(false)
  const [writeAllowed,setWriteAllowed]=useState(false),[executeAllowed,setExecuteAllowed]=useState(false)
+ const [chatId,setChatId]=useState(()=>crypto.randomUUID())
+ const archivedDrafts=useRef(new Map<string,NonNullable<ChatSnapshot['drafts']>[number]>())
  const [messages,setMessages]=useState<Turn[]>([]);const endRef=useRef<HTMLDivElement>(null);const taskLock=useRef(false)
  const [contextPaths,setContextPaths]=useState<string[]>([]),[usage,setUsage]=useState<number|null>(null)
  const [draft,setDraft]=useState<Draft|null>(null),[busy,setBusy]=useState(''),[error,setError]=useState('')
@@ -41,7 +45,7 @@ const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({agents
  const [manual,setManual]=useState(false),[picking,setPicking]=useState(false)
  const developer=agents.find(a=>a.role==='DEVELOPER'&&a.enabled),binding=developer?.modelBinding
  const action=async(label:string,fn:()=>Promise<void>)=>{if(busy)return false;setBusy(label);setError('');try{await fn();return true}catch(e){setError((e as Error).message);return false}finally{setBusy('')}}
- const adopt=(p:Project)=>{setInspection(null);setFlows({});setActiveFlowId(null);finishedFlows.current.clear();setProject(p);setSelected([]);setPreview(null);setDraft(null);setMessages([]);setHits([]);setContextPaths([]);setUsage(null);setSendAllowed(false);setWriteAllowed(false);setExecuteAllowed(false);setManual(false);setPath('')}
+ const adopt=(p:Project)=>{setChatId(crypto.randomUUID());archivedDrafts.current.clear();setInspection(null);setFlows({});setActiveFlowId(null);finishedFlows.current.clear();setProject(p);setSelected([]);setPreview(null);setDraft(null);setMessages([]);setHits([]);setContextPaths([]);setUsage(null);setSendAllowed(false);setWriteAllowed(false);setExecuteAllowed(false);setManual(false);setPath('')}
  const open=()=>action('Abrindo pasta',async()=>{adopt(await api<Project>('/projects/open',{path:path.trim(),confirmRead:readAllowed}))})
  const pick=()=>action('Escolha a pasta na janela do Windows',async()=>{
   if(disabled)throw Error('Conclua ou cancele a execução atual antes de abrir um projeto');
@@ -114,7 +118,7 @@ const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({agents
  };
  const inspect=(flowId:string,stageId:string)=>{setInspection({flowId,stageId});onInspect()};
  const showDraft=(id:string)=>{setWorkspaceView('files');void action('Abrindo proposta',async()=>{if(project){setDraft(await api(`/projects/${project.id}/drafts/${id}`));setWriteAllowed(false);setExecuteAllowed(false)}})};
- const newChat=()=>{if(busy||taskLock.current)return;onNewChat();setMessages([]);setWorkspaceView('files');setDraft(null);setContextPaths([]);setUsage(null);setError('');setPreview(null);setHits([]);setWriteAllowed(false);setExecuteAllowed(false)}
+ const newChat=()=>{if(busy||taskLock.current)return;onNewChat();setChatId(crypto.randomUUID());archivedDrafts.current.clear();setMessages([]);setWorkspaceView('files');setDraft(null);setContextPaths([]);setUsage(null);setError('');setPreview(null);setHits([]);setWriteAllowed(false);setExecuteAllowed(false)}
  useEffect(()=>{endRef.current?.scrollIntoView({block:'nearest',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})},[messages,busy,activeFlowId?flows[activeFlowId]?.stage:null])
 
  const modify=(path:string,kind:'apply'|'undo')=>action(kind==='apply'?'Aplicando arquivo revisado':'Desfazendo alteração',async()=>{if(!project||!draft)return;setDraft(await api(`/projects/${project.id}/drafts/${draft.id}/${kind}`,{path,confirmWrite:writeAllowed}));setPreview(null);const p=await api<{files:FileInfo[];warnings:string[]}>(`/projects/${project.id}/tree`);setProject({...project,...p})})
@@ -123,6 +127,16 @@ const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({agents
  const prepare=()=>action('Preparando navegador Docker — primeiro download pode levar alguns minutos',async()=>{const result=await api<{passed:boolean;output:string}>('/testing/browser/prepare',{confirmDownload:true});if(!result.passed)throw Error(result.output);})
  const test=()=>action('Executando testes na cópia isolada',async()=>{if(project&&draft)setDraft(await api(`/projects/${project.id}/drafts/${draft.id}/test`,{confirmExecute:executeAllowed}))})
  const select=(path:string)=>{setSelected(s=>s.includes(path)?s.filter(p=>p!==path):s.length<8?[...s,path]:s)}
+ useEffect(()=>{
+  if(!onArchive||!project||!messages.length)return
+  const chatFlows=messages.flatMap(message=>message.flowId&&flows[message.flowId]?[snapshotFlow(flows[message.flowId])]:[])
+  const draftIds=new Set([...messages.map(message=>message.draftId),...chatFlows.map(flow=>flow.draftId)])
+  if(draft&&draftIds.has(draft.id))archivedDrafts.current.set(draft.id,{
+   id:draft.id,status:draft.status,summary:draft.summary,
+   changes:draft.changes.map(({path,applied,diff})=>({path,applied,diff}))
+  })
+  onArchive({id:chatId,project:project.name,messages,flows:chatFlows,drafts:[...archivedDrafts.current.values()]})
+ },[chatId,draft,flows,messages,onArchive,project?.id,project?.name])
  useImperativeHandle(ref,()=>({submit:task,openFolder:pick}))
  const canSend=Boolean(project&&!busy)
  const draftFlow=draft?.workflowId?flows[draft.workflowId]:null;const canApplyDraft=!draft?.workflowId||(draftFlow?.status==='READY'&&draftFlow.draftId===draft.id)

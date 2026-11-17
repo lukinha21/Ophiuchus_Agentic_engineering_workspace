@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { MessageSquarePlus, Activity, BarChart3, Settings2, Zap, Square, ChevronDown, ChevronRight, Code2, ShieldCheck, FileText, BrainCircuit, Sparkles, CircleHelp, PanelRightOpen, Check, Clock3, ArrowUp, Workflow, Eye, RotateCcw, SlidersHorizontal, Cpu, ListTree, LayoutGrid, X, Terminal, MessageCircle, CircleDot, Search, Filter, Layers3, Gauge, Timer, GitBranch, ArrowRight, PanelLeftClose, FolderOpen, Bot, UserRound, Moon, Sun } from 'lucide-react'
 import type { AgentDefinition, RunAgentState, RunEvent, RunSnapshot, TaskDefinition, AgentStatus } from './domain'
@@ -15,6 +15,8 @@ import type {WorkspaceView} from './WorkspaceArea'
 import ProjectPanel from './ProjectPanel'
 import type {ProjectHandle,ProjectStatus} from './ProjectPanel'
 import RuntimeFlow from './RuntimeFlow'
+import ChatHistory,{historyKey,readChatHistory} from './ChatHistory'
+import type {ChatSnapshot} from './ChatHistory'
 import './workspace-v05.css'
 import './workspace-v06.css'
 import './workspace-v07.css'
@@ -42,7 +44,7 @@ export default function App(){
  const [reading,setReading]=useState(()=>{try{return localStorage.getItem('ophiuchus.reading')==='large'?'large':'normal'}catch{return 'normal'}})
  useEffect(()=>{try{localStorage.setItem('ophiuchus.reading',reading)}catch{}},[reading])
  useEffect(()=>{try{localStorage.setItem('ophiuchus.theme',theme)}catch{}document.documentElement.style.colorScheme=darkTheme?'dark':'light';},[theme])
- const [view,setView]=useState<'console'|'dashboard'|'settings'>(()=>new URLSearchParams(window.location.search).has('code')?'settings':'console')
+ const [view,setView]=useState<'console'|'dashboard'|'settings'|'history'>(()=>new URLSearchParams(window.location.search).has('code')?'settings':'console')
  const [agents,setAgents]=useState<AgentDefinition[]>(defaultAgents)
  const [states,setStates]=useState<RunAgentState[]>(defaultAgents.map(a=>({agentId:a.id,status:'IDLE',currentTask:'Aguardando execução',lastEvent:'Sem atividade',progress:0})))
  const [tasks,setTasks]=useState<TaskDefinition[]>(createTasks())
@@ -71,6 +73,21 @@ export default function App(){
  const [engineeringFilter,setEngineeringFilter]=useState<'all'|'active'|'completed'>('all')
  const [engineeringSelection,setEngineeringSelection]=useState<string|null>(null)
  const uiEpoch=useRef(0)
+ const [archive,setArchive]=useState(readChatHistory)
+ const [storageError,setStorageError]=useState(false)
+ const [plainChatId,setPlainChatId]=useState(()=>crypto.randomUUID())
+ const [projectChatId,setProjectChatId]=useState<string>()
+ const saveChat=useCallback((snapshot:ChatSnapshot)=>{
+  if(snapshot.project)setProjectChatId(snapshot.id)
+  const first=snapshot.messages.find(message=>message.role==='user')
+  if(!first)return
+  const title=first.text.trim().replace(/\s+/g,' ').slice(0,85)
+  setArchive(chats=>[{...snapshot,title,updatedAt:new Date().toISOString()},...chats.filter(chat=>chat.id!==snapshot.id)])
+ },[])
+ useEffect(()=>{
+  try{localStorage.setItem(historyKey,JSON.stringify(archive));setStorageError(false)}
+  catch{setStorageError(true)}
+ },[archive])
  const [chat,setChat]=useState<Array<{role:'user'|'assistant';content:string;error?:boolean}>>([])
  const [submitting,setSubmitting]=useState(false)
  const [cancelling,setCancelling]=useState(false)
@@ -108,8 +125,18 @@ export default function App(){
  }
  const run=await api<RuntimeRun>('/runs',{prompt:sent,agents,confirmSend:true});if(epoch!==uiEpoch.current)return;localStorage.setItem('ophiuchus.activeRun',run.id);setSelectedTask(null);setSelectedAgent(null);setShowAllArtifacts(false);setPrompt(current=>current.trim()===sent?'':current);applyRuntime(run)}catch(e){if(epoch===uiEpoch.current)setRuntimeError((e as Error).message)}finally{if(epoch===uiEpoch.current)setSubmitting(false)}}
  const runtimeAction=async(action:string,body:object={})=>{if(!runtimeRun||executingAI||cancelling)return;const epoch=uiEpoch.current;setRuntimeError('');if(action==='execute'||action==='continue')setExecutingAI(true);try{const run=await api<RuntimeRun>(`/runs/${runtimeRun.id}/${action}`,body);if(epoch===uiEpoch.current)applyRuntime(run)}catch(e){if(epoch===uiEpoch.current)setRuntimeError((e as Error).message)}finally{if(epoch===uiEpoch.current)setExecutingAI(false)}}
- const clear=()=>{setChat([]);uiEpoch.current++;localStorage.removeItem('ophiuchus.activeRun');setRuntimeRun(null);setRunning(false);setTasks(createTasks());setEvents([]);setSubmittedPrompt('');setPrompt('');setRuntimeError('');setExecutingAI(false);setSubmitting(false);setSelectedTask(null);setSelectedAgent(null);setShowAllArtifacts(false);setShowAllTasks(false);setShowWorkspace(true);setWorkspaceView('files');setEngineeringSelection(null);setEngineeringFilter('all');setPref('inspector',false);setView('console');setStates(agents.map(a=>({agentId:a.id,status:'IDLE',currentTask:'Aguardando execução',lastEvent:'Sem atividade',progress:0})))}
- const stop=async()=>{if(!runtimeRun||cancelling)return;const id=runtimeRun.id;setCancelling(true);setRuntimeError('');try{await api(`/runs/${id}/cancel`,{});clear()}catch(e){setRuntimeError('Não foi possível cancelar: '+(e as Error).message)}finally{setCancelling(false)}}
+ useEffect(()=>{
+  saveChat({id:plainChatId,messages:chat.map(turn=>({role:turn.role,text:turn.content,error:turn.error}))})
+ },[chat,plainChatId,saveChat])
+ const activeRunId=runtimeRun?.id
+ const activeRunPrompt=runtimeRun?.prompt
+ const activeRunStatus=runtimeRun?.sequence?.status==='PAUSED'?'FAILED':runtimeRun?.status
+ const activeRunActivity=runtimeRun?.events.at(-1)?.id
+ useEffect(()=>{
+  if(activeRunId&&activeRunPrompt)saveChat({id:activeRunId,messages:[{role:'user',text:activeRunPrompt}],runId:activeRunId,runStatus:activeRunStatus})
+ },[activeRunId,activeRunPrompt,activeRunStatus,activeRunActivity,saveChat])
+ const clear=()=>{setPlainChatId(crypto.randomUUID());setChat([]);uiEpoch.current++;localStorage.removeItem('ophiuchus.activeRun');setRuntimeRun(null);setRunning(false);setTasks(createTasks());setEvents([]);setSubmittedPrompt('');setPrompt('');setRuntimeError('');setExecutingAI(false);setSubmitting(false);setSelectedTask(null);setSelectedAgent(null);setShowAllArtifacts(false);setShowAllTasks(false);setShowWorkspace(true);setWorkspaceView('files');setEngineeringSelection(null);setEngineeringFilter('all');setPref('inspector',false);setView('console');setStates(agents.map(a=>({agentId:a.id,status:'IDLE',currentTask:'Aguardando execução',lastEvent:'Sem atividade',progress:0})))}
+ const stop=async()=>{if(!runtimeRun||cancelling)return;const id=runtimeRun.id;setCancelling(true);setRuntimeError('');try{await api(`/runs/${id}/cancel`,{});saveChat({id,messages:[{role:'user',text:runtimeRun.prompt}],runId:id,runStatus:'CANCELLED'});clear()}catch(e){setRuntimeError('Não foi possível cancelar: '+(e as Error).message)}finally{setCancelling(false)}}
  useEffect(()=>{if(!runtimeRun||runtimeRun.status!=='RUNNING')return;const id=setInterval(()=>{const p=projectRun(runtimeRun);setTasks(p.tasks);setStates(p.states)},600);return()=>clearInterval(id)},[runtimeRun])
  const previousProject=useRef(false)
  useEffect(()=>{if(previousProject.current!==projectStatus.active){if(projectStatus.active)clear();else setPrompt('');previousProject.current=projectStatus.active}},[projectStatus.active])
@@ -120,6 +147,7 @@ export default function App(){
  return <div className={`ophi-studio ${darkTheme?'theme-dark':''} theme-${theme} text-${reading} ${projectStatus.active?'has-project':''} v5-app v5-${prefs.mode} v5-${prefs.density} ${prefs.motion?'':'v5-reduced'}`}>
   <aside className="v5-dock" aria-label="Navegação"><div className="v5-logo" title="Ophiuchus"><BrandMark/></div>
    <button title="Console" aria-label="Console" className={view==='console'?'active':''} onClick={()=>setView('console')}><MessageCircle size={20}/></button>
+   <button title="Histórico de conversas" aria-label="Histórico de conversas" className={view==='history'?'active':''} onClick={()=>setView('history')}><Clock3 size={20}/></button>
    <button title="Dashboard" aria-label="Dashboard" className={view==='dashboard'?'active':''} onClick={()=>setView('dashboard')}><BarChart3 size={20}/></button>
    <button title="Provedores e agentes" aria-label="Configurações de provedores" className={view==='settings'?'active':''} onClick={()=>setView('settings')}><Settings2 size={20}/></button>
    <button title="Arquivos do projeto" aria-label="Arquivos do projeto" className={prefs.sidebar&&view==='console'?'active':''} onClick={()=>{setView('console');setPref('sidebar',!prefs.sidebar)}}><FolderOpen size={20}/></button><div className="v5-dock-spacer"/><button title="Preferências visuais" aria-label="Preferências visuais" onClick={()=>setShowPreferences(true)}><SlidersHorizontal size={20}/></button>
@@ -129,7 +157,7 @@ export default function App(){
    <div className="v5-live"><span className={`v5-led ${running?'pulse':''}`}/>{projectStatus.busy?'Trabalhando no projeto':projectStatus.active?projectStatus.name:running?'Execução em tempo real':finished?'Execução concluída':cancelled?'Execução cancelada':'Sistema pronto'}</div>
    <div className="v5-top-actions">{view==='console'&&<><button className="v5-mode-toggle" title={help.modes} onClick={()=>setPref('mode',prefs.mode==='focus'?'engineering':'focus')}><LayoutGrid size={15}/>{prefs.mode==='focus'?'Modo Foco':'Modo Engenharia'}</button></>}</div>
   </header>
-  {view==='dashboard'?<div className="v5-page"><Dashboard onGoConsole={()=>setView('console')}/></div>:view==='settings'?<div className="v5-page"><SettingsCenter agents={agents} onUpdate={updateBinding} onBack={()=>setView('console')}/></div>:<div ref={workspaceRef} style={{'--v6-agents':`${panelSizes.agents}px`,'--v6-inspector':`${panelSizes.inspector}px`} as React.CSSProperties} className={`v5-workspace v6-workspace ${!prefs.sidebar?'no-rail':''} ${effectiveInspector?'with-inspector':''} ${narrow?'v6-narrow':''}`}>
+  {view==='history'?<ChatHistory chats={archive} activeIds={[plainChatId,projectChatId||'',activeRunId||'']} storageError={storageError} onBack={()=>setView('console')}/>:view==='dashboard'?<div className="v5-page"><Dashboard onGoConsole={()=>setView('console')}/></div>:view==='settings'?<div className="v5-page"><SettingsCenter agents={agents} onUpdate={updateBinding} onBack={()=>setView('console')}/></div>:<div ref={workspaceRef} style={{'--v6-agents':`${panelSizes.agents}px`,'--v6-inspector':`${panelSizes.inspector}px`} as React.CSSProperties} className={`v5-workspace v6-workspace ${!prefs.sidebar?'no-rail':''} ${effectiveInspector?'with-inspector':''} ${narrow?'v6-narrow':''}`}>
    {prefs.sidebar&&<aside className="v5-project-sidebar" ref={setProjectSidebarHost}/>}
    {prefs.sidebar&&!narrow&&<div className="v6-resizer v6-resizer-left" role="separator" aria-orientation="vertical" aria-label="Redimensionar explorador de arquivos" title="Arraste para redimensionar o explorador" onPointerDown={e=>beginResize('agents',e)}/>}
    <section className="v5-center"><div className="v5-console-head"><div className="v5-console-heading"><span className="v5-kicker"><Sparkles size={13}/> CONTEXTO → CONSTRUÇÃO</span><h1>{projectStatus.active?'Trabalho em movimento.':'Dê forma ao próximo passo.'}</h1><p>Uma equipe, um projeto. Cada decisão deixa um registro.</p></div><div className="v5-console-tools">{!projectStatus.active&&<button className="workspace-new-chat" disabled={submitting||cancelling||executingAI||Boolean(runtimeRun&&['RUNNING','WAITING_APPROVAL'].includes(runtimeRun.status))} title={runtimeRun&&['RUNNING','WAITING_APPROVAL'].includes(runtimeRun.status)?'Conclua ou cancele a execução atual antes de abrir outro chat':'Iniciar uma conversa vazia; as execuções anteriores continuam salvas'} onClick={clear}><MessageSquarePlus size={16}/> Novo chat</button>}<span className="v5-demo-pill">RUNTIME LOCAL</span><Tip text={help.console}/>{running&&<button className="v5-stop" onClick={stop}><Square size={12}/> Parar</button>}</div></div>
@@ -153,7 +181,7 @@ export default function App(){
    {!effectiveInspector&&prefs.mode==='engineering'&&<button className="v5-inspector-open" title="Abrir Inspector" onClick={()=>setPref('inspector',true)}><PanelRightOpen size={17}/></button>}
   </div>}
   </div>
-  <ProjectPanel ref={projectRef} agents={agents} engineering={prefs.mode==='engineering'} inspectorTarget={projectInspectorHost} onInspect={()=>setPref('inspector',true)} onCloseInspector={()=>setPref('inspector',false)} onSettings={()=>setView('settings')} sidebarTarget={projectSidebarHost} workTarget={projectWorkHost} onStatus={setProjectStatus} onNewChat={()=>setPrompt('')} disabled={running||submitting}/>
+  <ProjectPanel ref={projectRef} onArchive={saveChat} agents={agents} engineering={prefs.mode==='engineering'} inspectorTarget={projectInspectorHost} onInspect={()=>setPref('inspector',true)} onCloseInspector={()=>setPref('inspector',false)} onSettings={()=>setView('settings')} sidebarTarget={projectSidebarHost} workTarget={projectWorkHost} onStatus={setProjectStatus} onNewChat={()=>setPrompt('')} disabled={running||submitting}/>
 
   {showPreferences&&<div className="v5-overlay" onMouseDown={()=>setShowPreferences(false)}><motion.div className="v5-preferences" initial={{x:40,opacity:0}} animate={{x:0,opacity:1}} onMouseDown={e=>e.stopPropagation()}><div className="v5-preferences-head"><div><span className="v5-kicker">PERSONALIZAÇÃO</span><h2>Seu workspace, seu jeito.</h2><p>As preferências são salvas neste navegador.</p></div><button onClick={()=>setShowPreferences(false)} aria-label="Fechar"><X size={20}/></button></div><div className="v5-pref-section"><h3>Modo de trabalho <Tip text={help.modes}/></h3><div className="v5-mode-cards"><button className={prefs.mode==='focus'?'selected':''} onClick={()=>setPref('mode','focus')}><Sparkles size={20}/><strong>Foco</strong><small>Conversa e tarefa atual</small></button><button className={prefs.mode==='engineering'?'selected':''} onClick={()=>setPref('mode','engineering')}><Workflow size={20}/><strong>Engenharia</strong><small>Plano e detalhes</small></button></div></div><div className="v5-pref-section"><h3>Tema de cores</h3><ThemePicker value={theme} onChange={setTheme}/></div><div className="v5-pref-section"><h3>Tamanho do texto</h3><div className="v5-segment"><button aria-pressed={reading==='normal'} className={reading==='normal'?'selected':''} onClick={()=>setReading('normal')}>Padrão legível</button><button aria-pressed={reading==='large'} className={reading==='large'?'selected':''} onClick={()=>setReading('large')}>Ampliado</button></div><p>O tamanho das letras é independente do espaçamento compacto.</p></div><div className="v5-pref-section"><h3>Densidade</h3><div className="v5-segment"><button className={prefs.density==='comfortable'?'selected':''} onClick={()=>setPref('density','comfortable')}>Confortável</button><button className={prefs.density==='compact'?'selected':''} onClick={()=>setPref('density','compact')}>Compacta</button></div></div><div className="v5-pref-section"><h3>Painéis e experiência</h3>{([{key:'sidebar',label:'Explorador do projeto',icon:ListTree},{key:'inspector',label:'Inspector contextual',icon:PanelRightOpen},{key:'metrics',label:'Métricas rápidas',icon:Activity},{key:'motion',label:'Animações e transições',icon:Zap}] as const).map(item=>{const Icon=item.icon;return <label className="v5-switch-row" key={item.key}><span><Icon size={17}/>{item.label}</span><input type="checkbox" checked={prefs[item.key]} onChange={e=>setPref(item.key,e.target.checked)}/><i/></label>})}</div><div className="v5-pref-section"><h3>Detalhamento no modo Engenharia</h3><div className="v5-segment">{(['summary','subtasks','debug'] as const).map(a=><button key={a} className={prefs.activity===a?'selected':''} onClick={()=>setPref('activity',a)}>{a==='summary'?'Resumo':a==='subtasks'?'Subtarefas':'Debug'}</button>)}</div><p className="v5-pref-hint">Eventos continuam disponíveis no Inspector, independentemente do modo.</p></div><button className="v5-reset" onClick={()=>setPrefs(defaults)}><RotateCcw size={15}/> Restaurar padrão</button></motion.div></div>}
  </div>
