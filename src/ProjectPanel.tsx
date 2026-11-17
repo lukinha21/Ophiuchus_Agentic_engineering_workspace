@@ -56,7 +56,7 @@ const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({agents
   if(!project||taskLock.current||busy)return false;
   const turnId=crypto.randomUUID();
   const history=messages.filter(m=>!m.error).slice(-6).map(({role,text})=>({role,content:text.slice(0,1800)}));
-  const intent=routeIntent(request,history);
+  const intent=routeIntent(request,history,new Date(),binding);
   setMessages(m=>[...m,{id:turnId,role:'user',text:request}]);
   if(intent.kind==='local'||(mode==='auto'&&intent.kind==='clarify')){
    setMessages(m=>[...m,{id:crypto.randomUUID(),role:'assistant',text:intent.answer}]);
