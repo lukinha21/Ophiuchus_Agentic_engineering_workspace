@@ -1,3 +1,24 @@
+import productHelp from '../runtime/product-help.json' with {type: 'json'}
+
+function answerProductQuestion(question: string) {
+  const asks = /^(?:como|onde|qual|quais|o que|me (?:explica|explique|fala|fale|mostra|mostre)|explique|descreva)\b/
+  const aboutOphiuchus = /\b(?:do ophiuchus|no ophiuchus|o ophiuchus|sua arquitetura|seu funcionamento|voce funciona|seus agentes|voce usa)\b/
+  const aboutExternalProject = /\b(?:do meu (?:app|projeto|sistema)|no meu (?:app|projeto|sistema)|deste projeto|desse projeto|dessa (?:aplicacao|funcao))\b/
+  const alsoRequestsWork = /\be\s+(?:crie|adicione|implemente|corrija|remova|altere|refatore|gere|escreva)\b/
+  if ((!asks.test(question) && !aboutOphiuchus.test(question)) ||
+    aboutExternalProject.test(question) || alsoRequestsWork.test(question)) return undefined
+  if (/^(?:crie|adicione|implemente|corrija|altere|refatore|gere|escreva)\b/.test(question)) return undefined
+  if (/^(?:como|me (?:ensina|ensine) a) (?:eu |posso )?(?:criar|adicionar|implementar|programar|construir)\b/.test(question)) return undefined
+
+  if (/\b(?:debug|diagnostico|inspector|modo engenharia|entrada \/ saida)\b/.test(question)) return productHelp.debug
+  if (/\bdashboard\b/.test(question)) return productHelp.dashboard
+  if (/\b(?:cofre|chave (?:de )?api|conectar (?:o )?(?:gemini|provedor))\b/.test(question)) return productHelp.vault
+  if (/\b(?:historico|retomar (?:uma |a )?conversa)\b/.test(question)) return productHelp.history
+  if (/\b(?:configur\w*|alter\w*|modific\w*|mud\w*|troc\w*|escolh\w*)\b.*\b(?:agentes?|modelos?)\b|\bagentes e modelos\b/.test(question)) return productHelp.agents
+  if (aboutOphiuchus.test(question) && /\b(?:arquitetura|funciona|funcionamento|tecnologias?|stack|runtime|electron|backend)\b/.test(question)) return productHelp.architecture
+  if (aboutOphiuchus.test(question) && /\b(?:agentes?|fluxos?|equipe|funciona)\b/.test(question)) return productHelp.workflow
+}
+
 type HistoryTurn = {role: 'user' | 'assistant'; content: string}
 
 const identityAnswers = {
@@ -15,7 +36,7 @@ export function routeIntent(prompt: string, history: HistoryTurn[] = [], now = n
   if (/^(?:quem (?:e voce|voce e)|o que (?:e voce|voce e)|qual (?:e )?(?:o )?seu nome|who are you|what are you)$/.test(question)) {
     return {kind: 'local', answer: identityAnswers.introduction} as const
   }
-  if (/^(?:(?:para que|o que) (?:voce (?:serve|faz|pode fazer)|serve o ophiuchus|faz o ophiuchus)|como voce (?:funciona|pode me ajudar)|what can you do|what do you do)$/.test(question)) {
+  if (/^(?:(?:para que|o que) (?:voce (?:serve|faz|pode fazer)|serve o ophiuchus|faz o ophiuchus)|como voce pode me ajudar|what can you do|what do you do)$/.test(question)) {
     return {kind: 'local', answer: identityAnswers.introduction + ' ' + identityAnswers.capabilities} as const
   }
   if (/^(?:qual (?:modelo|ia) (?:voce (?:usa|esta usando)|e usado)|qual (?:e )?(?:o )?seu modelo|what model (?:are you using|do you use))$/.test(question)) {
@@ -24,6 +45,9 @@ export function routeIntent(prompt: string, history: HistoryTurn[] = [], now = n
       : 'O chat está sem modelo de IA configurado. As respostas locais do Ophiuchus continuam disponíveis.'
     return {kind: 'local', answer} as const
   }
+  const productAnswer = answerProductQuestion(question)
+  if (productAnswer) return {kind: 'local', answer: productAnswer} as const
+
   if (/^(?:que dia e hoje|qual (?:e )?a data de hoje|data de hoje|what(?:'s| is) today'?s date)$/.test(text)) {
     return {kind: 'local', answer: new Intl.DateTimeFormat('pt-BR', {dateStyle: 'full'}).format(now)} as const
   }

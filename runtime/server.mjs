@@ -1,3 +1,4 @@
+import productHelp from './product-help.json' with {type:'json'};
 import {driveSequence} from './run-sequence.mjs';
 import {prepareBrowser} from './browser-testing.mjs';
 import {pickNativeFolder} from './native-folder.mjs';
@@ -113,7 +114,7 @@ export const server=http.createServer(async(req,res)=>{
    const history=Array.isArray(body.history)?body.history.slice(-6).filter(turn=>turn&&['user','assistant'].includes(turn.role)&&typeof turn.content==='string').map(({role,content})=>({role,content:content.slice(0,1800)})):[];
    if(binding.providerId==='mock')throw Error('Configure um provedor real para respostas de IA');
    const result=await generateText({providerId:binding.providerId,model:binding.modelId,maxOutputTokens:2048,messages:[
-    {role:'system',content:'Você responde como Ophiuchus, o assistente de engenharia de software deste aplicativo. Ophiuchus coordena agentes e seu modelo nesta chamada é '+binding.modelId+' ('+binding.providerId+'). Se perguntarem sua identidade, apresente-se como Ophiuchus e identifique o modelo quando solicitado. Responda diretamente à pergunta do usuário em linguagem natural. Você não pode acessar, alterar ou testar arquivos do usuário.'},
+    {role:'system',content:'Você responde como Ophiuchus, o assistente de engenharia de software deste aplicativo. Ophiuchus coordena agentes e seu modelo nesta chamada é '+binding.modelId+' ('+binding.providerId+'). Se perguntarem sua identidade, apresente-se como Ophiuchus e identifique o modelo quando solicitado. Responda diretamente à pergunta do usuário em linguagem natural. Você não pode acessar, alterar ou testar arquivos do usuário. Para perguntas sobre o Ophiuchus, use a referência do produto. Se a referência não cobrir um detalhe, diga que não consegue confirmá-lo. Referência: '+Object.values(productHelp).join('\n\n')},
     ...history,{role:'user',content:body.prompt}
    ]},{signal:AbortSignal.timeout(90000)});
    if(result.finishReason==='length'||!result.text?.trim())throw Error('O modelo não retornou uma resposta completa');
