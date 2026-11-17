@@ -15,6 +15,39 @@ async function fixture(t,generate,options={}){
  return {service,root,calls,usage,project,get dockerCalls(){return dockerCalls},start:extra=>service.startFlow(project.id,{goal:'Corrija soma',paths:['sum.mjs'],bindings,confirmSend:true,...extra})};
 }
 async function done(f,id){for(let i=0;i<400;i++){const flow=await f.service.flow(f.project.id,id);if(!['RUNNING','CANCELLING'].includes(flow.status))return flow;await new Promise(r=>setTimeout(r,5));}throw Error('workflow timeout');}
+test('automatic corrections use the focused team and flag architectural requests for the full team',async t=>{
+ const focused=await fixture(t);
+ const flow=await done(focused,(await focused.start({profile:'auto'})).id);
+ assert.equal(flow.status,'READY');
+ assert.equal(flow.profile,'focused');
+ assert.deepEqual(focused.calls.map(call=>call.model),['developer','reviewer','qa']);
+
+ const full=await fixture(t);
+ const architectural=await done(full,(await full.start({profile:'auto',goal:'Corrija o contrato público da soma'})).id);
+ assert.equal(architectural.status,'READY');
+ assert.equal(architectural.profile,'full');
+ assert.equal(architectural.calls,6);
+});
+
+test('automatic promotion reviews a new draft and prevents applying the superseded draft',async t=>{
+ let developmentCalls=0;
+ const f=await fixture(t,args=>{
+  if(args.model!=='developer'||++developmentCalls!==1)return answer(args.model);
+  const response=answer('developer'),proposal=JSON.parse(response.text);
+  proposal.changes.push({path:'extra.mjs',content:'export const extra = true;',reason:'Arquivo adicional'});
+  return {...response,text:JSON.stringify(proposal)};
+ });
+ const flow=await done(f,(await f.start({profile:'auto'})).id);
+ assert.equal(flow.status,'READY',flow.error);
+ assert.equal(flow.profile,'full');
+ assert.equal(flow.calls,7);
+ const promotion=flow.events.find(event=>event.type==='flow.escalated');
+ assert.ok(promotion);
+ assert.notEqual(promotion.draftId,flow.draftId);
+ await assert.rejects(f.service.apply(f.project.id,promotion.draftId,{path:'sum.mjs',confirmWrite:true}),/pareceres/);
+ await f.service.apply(f.project.id,flow.draftId,{path:'sum.mjs',confirmWrite:true});
+});
+
 test('six agents hand off real artifacts, isolate proposal and require explicit write',async t=>{
  const f=await fixture(t),started=await f.start(),flow=await done(f,started.id);
  assert.equal(flow.status,'READY');assert.deepEqual(f.calls.map(c=>c.model),PROJECT_STAGES.map(s=>s.id));assert.equal(flow.calls,6);assert.equal(flow.validation,'STATIC_ONLY');assert.equal(f.dockerCalls,0);

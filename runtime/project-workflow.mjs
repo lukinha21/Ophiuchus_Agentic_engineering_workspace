@@ -12,6 +12,12 @@ export const PROJECT_STAGES=Object.freeze([
  {id:'qa',label:'Critérios',name:'QA'},
  {id:'documentation',label:'Entrega',name:'Documentação'}
 ]);
+const focusedStages=PROJECT_STAGES.filter(stage=>['developer','reviewer','qa'].includes(stage.id));
+const higherImpact=/\b(?:autenticacao|login|auth|oauth|permiss(?:ao|oes)|seguranca|migrac(?:ao|oes)|schema|banco de dados|contrato(?: publico)?|arquitetura|refatoracao|dependencia|api publica|breaking change)\b/;
+const normalize=text=>text.normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase();
+const isTestPath=path=>/(?:^|\/)(?:tests?|__tests__)\/|(?:[._-](?:test|spec)[._-]|Test\.)/.test(path);
+const isSensitivePath=path=>/(?:^|[\/._-])(?:auth|security|migrations?|schema|package|permissions?|contracts?)(?:[\/._-]|$)/i.test(path);
+
 const instructions={
  orchestrator:'Defina um plano proporcional ao pedido, com escopo, até 5 passos e critérios de aceite. Não escreva código. Para pedidos abertos ou criativos, escolha UMA única melhoria pequena e independente; não acrescente mecânicas extras. Limite o plano a 400 palavras. Considere somente os arquivos fornecidos. Responda de forma breve.',
  architect:'Defina a abordagem e contratos necessários para o plano no projeto existente. Preserve a linguagem e interfaces. Cite somente decisões relevantes, riscos e dependências, sem escrever código. Não repita o plano. Preserve somente uma melhoria pequena; se o plano acumular funcionalidades, reduza para uma. Até 400 palavras.',
@@ -39,9 +45,17 @@ export function createProjectWorkflows({reserve,release,persist,generate,impleme
   await checkBindings(bindings);
   const policy=normalizePolicy(request.policy);
   const id=randomUUID(),context=await reserve(projectId,id,{...request,history:compactConversation(request.history||[],policy.history)});
-  const f={id,projectId,goal:request.goal,status:'RUNNING',stage:'orchestrator',calls:0,maxCalls:7,contractsVersion:1,policy,activeMs:0,totalTimeoutMs,retries:0,canResume:false,createdAt:new Date().toISOString(),bindings,contextPaths:context.files.map(x=>x.path),draftId:null,summary:'',error:null,errorInfo:null,validation:'NOT_EXECUTED',events:[],stages:PROJECT_STAGES.map(s=>({...s,status:'QUEUED',text:'',detail:'',startedAt:null,endedAt:null,durationMs:0,usage:null,attempts:[]}))};
+  const recentGoal=context.history?.filter(turn=>turn.role==='user').at(-1)?.content||'';
+  const goal=normalize(request.goal);
+  const refersBack=/\b(?:isso|isto|esse erro|esse bug)\b/.test(goal);
+  const focused=request.profile==='auto'&&/\b(?:corrija|corrige|corrigir|conserte|conserta|ajuste|fix)\b/.test(goal)
+   &&!higherImpact.test(goal+(refersBack?' '+normalize(recentGoal):''))
+   &&(request.paths?.length??0)<=1&&!context.files.some(file=>isSensitivePath(file.path));
+  const stages=focused?focusedStages:PROJECT_STAGES;
+  const createStages=definitions=>definitions.map(s=>({...s,status:'QUEUED',text:'',detail:'',startedAt:null,endedAt:null,durationMs:0,usage:null,attempts:[]}));
+  const f={id,projectId,goal:request.goal,profile:focused?'focused':'full',status:'RUNNING',stage:stages[0].id,calls:0,maxCalls:7,contractsVersion:1,policy,activeMs:0,totalTimeoutMs,retries:0,canResume:false,createdAt:new Date().toISOString(),bindings,contextPaths:context.files.map(x=>x.path),draftId:null,summary:'',error:null,errorInfo:null,validation:'NOT_EXECUTED',events:[],stages:createStages(stages)};
   const controller=new AbortController();flows.set(id,f);contexts.set(id,context);controllers.set(id,controller);
-  event(f,'flow.created','Contexto autorizado e modelos congelados',{paths:f.contextPaths});
+  event(f,'flow.created','Contexto autorizado e modelos congelados',{paths:f.contextPaths,profile:f.profile});
   try{await save(f);}catch(e){flows.delete(id);contexts.delete(id);controllers.delete(id);await release(projectId,id);throw e;}
   void drive(f,context,controller,0,stageTimeoutMs).catch(()=>{});
   return publicFlow(f);
@@ -71,6 +85,13 @@ export function createProjectWorkflows({reserve,release,persist,generate,impleme
      const guidance=JSON.stringify(f.stages.filter(s=>s.status==='COMPLETED').map(s=>({role:s.id,result:s.handoff||s.text.slice(0,1400)})));const policy={...f.policy,...f.policy.agents.developer};
      const result=await implement(f.projectId,{goal:f.goal,mode:'propose',paths:f.contextPaths,binding:f.bindings.developer,history:context.history,confirmSend:true},{signal,timeoutMs:currentTimeout,workflowId:f.id,expectedHashes:original,guidance,policy,onModelCall:n=>sent(n?'Recuperação limitada: reduzindo a proposta':'Preparando proposta isolada'),onModelRequest:request,onModelResponse:received});
      f.draftId=result.draft.id;stage.text=result.draft.summary;stage.handoff={summary:result.draft.summary,files:result.draft.changes.map(c=>c.path)};stage.usage=result.draft.usage||null;event(f,'handoff.validated','Contrato do desenvolvedor e trechos da proposta validados localmente',{contract:'ophiuchus_developer_v1'});
+     const changes=result.draft.changes;
+     if(f.profile==='focused'&&(changes.filter(change=>!isTestPath(change.path)).length>1||changes.some(change=>isSensitivePath(change.path)))){
+      event(f,'flow.escalated','A proposta afeta vários arquivos de produção ou um contrato sensível. Iniciando planejamento completo.',{draftId:f.draftId});
+      f.profile='full';f.draftId=null;f.stage='orchestrator';
+      f.stages=PROJECT_STAGES.map(s=>({...s,status:'QUEUED',text:'',detail:'',startedAt:null,endedAt:null,durationMs:0,usage:null,attempts:[]}));
+      await save(f);i=-1;continue;
+     }
     }else{
      let draft;
      if(['reviewer','qa','documentation'].includes(stage.id)){
@@ -102,7 +123,7 @@ export function createProjectWorkflows({reserve,release,persist,generate,impleme
     }
     signal.throwIfAborted();stage.status='COMPLETED';stage.detail='';stage.endedAt=new Date().toISOString();event(f,'stage.completed',stage.name+' concluiu a etapa',{durationMs:stage.durationMs});await save(f);
    }
-   f.status='READY';f.validation='STATIC_ONLY';f.summary=f.stages.at(-1).text;event(f,'flow.ready','Pareceres estáticos concluídos; escrita e testes continuam separados');await save(f);
+   f.status='READY';f.validation='STATIC_ONLY';f.summary=f.profile==='focused'?[f.stages[0].text,f.stages.at(-1).text].join('\n\n'):f.stages.at(-1).text;event(f,'flow.ready','Pareceres estáticos concluídos; escrita e testes continuam separados');await save(f);
   }catch(e){
    const s=current(),a=attempt();
    f.status=controller.signal.aborted?'CANCELLED':'FAILED';f.errorInfo=projectError(e,{stage:s.name,timeoutMs:currentTimeout,cancelled:controller.signal.aborted});f.error=f.errorInfo.message;
@@ -135,7 +156,7 @@ export function createProjectWorkflows({reserve,release,persist,generate,impleme
  }
  async function restore(projectId,snapshot,context){
   if(flows.has(snapshot.id))return publicFlow(find(projectId,snapshot.id));
-  if(snapshot.status!=='FAILED'||!snapshot.canResume||snapshot.draftId||snapshot.maxCalls!==7||!Number.isInteger(snapshot.calls)||snapshot.calls<1||snapshot.calls>=7||snapshot.retries!==0||!Array.isArray(snapshot.stages)||snapshot.stages.length!==6||snapshot.stages.some((s,i)=>s.id!==PROJECT_STAGES[i].id)||!context.files.length)throw Error('Checkpoint não pode ser restaurado; somente falhas anteriores à proposta e sem retomada prévia');
+  if(snapshot.status!=='FAILED'||!snapshot.canResume||snapshot.draftId||snapshot.maxCalls!==7||!Number.isInteger(snapshot.calls)||snapshot.calls<1||snapshot.calls>=7||snapshot.retries!==0||!Array.isArray(snapshot.stages)||snapshot.stages.length!==(snapshot.profile==='focused'?focusedStages:PROJECT_STAGES).length||snapshot.stages.some((s,i)=>s.id!==(snapshot.profile==='focused'?focusedStages:PROJECT_STAGES)[i].id)||!context.files.length)throw Error('Checkpoint não pode ser restaurado; somente falhas anteriores à proposta e sem retomada prévia');
   const f=structuredClone(snapshot);f.originProjectId=f.originProjectId||f.projectId;f.projectId=projectId;f.policy=normalizePolicy(f.policy);flows.set(f.id,f);contexts.set(f.id,context);settled.add(f.id);event(f,'flow.restored','Checkpoint anterior à proposta restaurado com hashes verificados');
   try{await save(f);}catch(e){flows.delete(f.id);contexts.delete(f.id);settled.delete(f.id);throw e;}return publicFlow(f);
  }

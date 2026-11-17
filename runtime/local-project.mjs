@@ -158,7 +158,7 @@ export function createProjectService({storageRoot=process.env.OPHIUCHUS_PROJECTS
  async function getDraft(id,draftId){const p=await grant(id),d=p.drafts.get(draftId);if(!d)throw Error('Rascunho não pertence à sessão');return publicDraft(d);}
  async function current(p,path){try{return (await source(p,path)).sha256;}catch(e){if(e.code==='ENOENT')return null;throw e;}}
  async function apply(id,draftId,{path,confirmWrite}){
-  const p=await grant(id),d=p.drafts.get(draftId);if(!d||p.busy||p.workflowId)throw Error('Rascunho inválido ou projeto ocupado');if(confirmWrite!==true)throw Error('Aprovação explícita de gravação obrigatória');if(d.workflowId&&workflows.get(id,d.workflowId).status!=='READY')throw Error('Proposta aguarda conclusão e aprovação dos pareceres do fluxo');const c=d.changes.find(c=>c.path===path);if(!c||c.applied)throw Error('Alteração ausente ou já aplicada');
+  const p=await grant(id),d=p.drafts.get(draftId);if(!d||p.busy||p.workflowId)throw Error('Rascunho inválido ou projeto ocupado');if(confirmWrite!==true)throw Error('Aprovação explícita de gravação obrigatória');if(d.workflowId&&!isApprovedDraft(id,d))throw Error('Proposta aguarda conclusão e aprovação dos pareceres do fluxo');const c=d.changes.find(c=>c.path===path);if(!c||c.applied)throw Error('Alteração ausente ou já aplicada');
   p.busy=true;try{const catalog=await scan(p);if(ignored(path,catalog.rules)||c.baseHash&&!catalog.files.some(f=>f.path===path))throw Error('Arquivo passou a ser ignorado; aplicação bloqueada');if(await current(p,path)!==c.baseHash)throw Error('Conflito: arquivo original mudou desde a proposta. Refaça a análise');
    const dest=await guarded(p,path,{missing:true});await mkdir(dirname(dest),{recursive:true});await guarded(p,path,{missing:true});const temp=join(dirname(dest),'.ophiuchus-'+randomUUID()+'.tmp');
    try{await writeFile(temp,c.content,{flag:'wx',mode:c.mode});if(await current(p,path)!==c.baseHash)throw Error('Conflito durante aplicação');await guarded(p,path,{missing:true});await rename(temp,dest);}finally{await unlink(temp).catch(()=>{});}
@@ -181,12 +181,13 @@ export function createProjectService({storageRoot=process.env.OPHIUCHUS_PROJECTS
  async function deliver(id,draftId,{confirmWithoutTests,reason}){
   const p=await grant(id),d=p.drafts.get(draftId);
   if(!d||p.busy||p.workflowId||confirmWithoutTests!==true)throw Error('Confirme explicitamente a conclusão sem testes');
-  if(d.workflowId&&workflows.get(id,d.workflowId).status!=='READY')throw Error('Aguarde os pareceres do fluxo');
+  if(d.workflowId&&!isApprovedDraft(id,d))throw Error('Aguarde os pareceres do fluxo');
   if(typeof reason!=='string'||!reason.trim()||reason.length>1500)throw Error('Informe o motivo da ausência de validação aprovada');
   if(d.test?.passed===true)throw Error('Esta cópia já possui validação aprovada');
   d.delivery={status:'WITHOUT_APPROVED_TESTS',reason:reason.trim(),validation:d.test?.passed===false?'FAILED':'NOT_RUN',at:new Date().toISOString()};
   await saveDraft(p,d);return publicDraft(d);
  }
+ const isApprovedDraft=(id,d)=>{const flow=workflows.get(id,d.workflowId);return flow.status==='READY'&&flow.draftId===d.id;};
  async function close(id){const p=await grant(id);if(p.busy||p.workflowId)throw Error('Aguarde a tarefa terminar antes de fechar o projeto');await audit(p,{type:'project.closed'});grants.delete(id);return {closed:true};}
  const workflows=createProjectWorkflows({
   ...workflowOptions,generate,onUsage,getDraft,implement:task,

@@ -11,7 +11,7 @@ import {resolve,dirname} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {createRun,startRun,completeStage,approve,reportFailure,cancel} from './orchestrator.mjs';
 import {capabilities} from './model-capabilities.mjs';
-import {listProviders,listModels} from './providers.mjs';
+import {generateText,listProviders,listModels} from './providers.mjs';
 import {vaultStatus,unlockVault,lockVault,saveCredential,removeCredential,saveCustomEndpoint} from './vault.mjs';
 import {executeStage} from './executor.mjs';
 import {extractProposals,listWorkspace,readWorkspaceFile,applyProposals} from './workspace.mjs';
@@ -103,6 +103,21 @@ export const server=http.createServer(async(req,res)=>{
     if(req.method==='POST'&&['apply','undo','test','deliver'].includes(draftAction))return json(res,200,await projects[draftAction](id,draftId,await readBody(req)));
    }
    return json(res,405,{error:'Ação do projeto não permitida'});
+  }
+  if(req.method==='POST'&&url.pathname==='/chat/direct'){
+   const body=await readBody(req);
+   if(body.confirmSend!==true)throw Error('Autorize o envio da conversa ao modelo');
+   if(typeof body.prompt!=='string'||!body.prompt.trim()||body.prompt.length>8000)throw Error('Pedido inválido');
+   const binding=body.binding;
+   if(typeof binding?.providerId!=='string'||typeof binding.modelId!=='string'||!binding.modelId.trim())throw Error('Configure um modelo para o chat');
+   const history=Array.isArray(body.history)?body.history.slice(-6).filter(turn=>turn&&['user','assistant'].includes(turn.role)&&typeof turn.content==='string').map(({role,content})=>({role,content:content.slice(0,1800)})):[];
+   if(binding.providerId==='mock')throw Error('Configure um provedor real para respostas de IA');
+   const result=await generateText({providerId:binding.providerId,model:binding.modelId,maxOutputTokens:2048,messages:[
+    {role:'system',content:'Responda diretamente à pergunta do usuário em linguagem natural. Você não pode acessar, alterar ou testar arquivos do usuário.'},
+    ...history,{role:'user',content:body.prompt}
+   ]},{signal:AbortSignal.timeout(90000)});
+   if(result.finishReason==='length'||!result.text?.trim())throw Error('O modelo não retornou uma resposta completa');
+   return json(res,200,{answer:result.text});
   }
   if(req.method==='GET'&&url.pathname==='/health')return json(res,200,{ok:true,service:'ophiuchus-control-plane',providerExecution:true});
   if(req.method==='GET'&&url.pathname==='/capabilities')return json(res,200,capabilities(url.searchParams.get('provider'),url.searchParams.get('model')||''));
