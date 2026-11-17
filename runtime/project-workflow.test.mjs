@@ -98,6 +98,26 @@ test('timeout exposes actionable diagnostics and a single authorized resume skip
  await f.service.resumeFlow(f.project.id,id,{confirmSend:true,timeoutMs:180000});const flow=await done(f,id);assert.equal(flow.status,'READY');assert.equal(flow.calls,7);assert.equal(f.calls.filter(c=>c.model==='orchestrator').length,1);assert.equal(flow.stages[1].attempts.length,2);assert.equal(flow.stages[1].attempts[1].timeoutMs,180000);assert.ok(flow.events.some(e=>e.type==='flow.resumed'));assert.deepEqual(flow.events.map(e=>e.seq),flow.events.map((_,i)=>i+1));
 });
 
+test('HTTP 429 can retry only the failed agent with a replacement model',async t=>{
+ let limited=true;
+ const f=await fixture(t,async args=>{
+  if(args.model==='architect'&&limited){limited=false;throw Error('Google Gemini HTTP 429');}
+  return answer(args.model==='replacement'?'architect':args.model);
+ });
+ const id=(await f.start()).id,failed=await done(f,id);
+ assert.equal(failed.errorInfo.code,'PROVIDER_HTTP_429');
+ assert.equal(failed.canResume,true);
+ const replacementBinding={providerId:'google',modelId:'replacement'};
+ await assert.rejects(f.service.resumeFlow(f.project.id,id,{confirmSend:true,replacementBinding}),/Autorize a troca/);
+ await f.service.resumeFlow(f.project.id,id,{confirmSend:true,confirmModelChange:true,replacementBinding});
+ const finished=await done(f,id);
+ assert.equal(finished.status,'READY');
+ assert.deepEqual(f.calls.map(call=>call.model),['orchestrator','architect','replacement','developer','reviewer','qa','documentation']);
+ assert.equal(finished.bindings.architect.modelId,'replacement');
+ assert.equal(finished.bindings.developer.modelId,'developer');
+ assert.equal(finished.bindings.orchestrator.modelId,'orchestrator');
+});
+
 test('repeated transport failure cannot resume endlessly or overwrite a source changed after failure',async t=>{
  const f=await fixture(t,async a=>{if(a.model==='architect')throw new DOMException('timeout','TimeoutError');return answer(a.model)});
  const id=(await f.start()).id;await done(f,id);await f.service.resumeFlow(f.project.id,id,{confirmSend:true});const flow=await done(f,id);assert.equal(flow.status,'FAILED');assert.equal(flow.calls,3);assert.equal(flow.canResume,false);await assert.rejects(f.service.resumeFlow(f.project.id,id,{confirmSend:true}),/não pode/);

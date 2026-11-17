@@ -143,12 +143,27 @@ export function createProjectWorkflows({reserve,release,persist,generate,impleme
   const timeoutMs=request.timeoutMs??stageTimeoutMs;if(![stageTimeoutMs,180000].includes(timeoutMs))throw Error('Prazo de retomada inválido');
   if(f.activeMs>=totalTimeoutMs)throw Error('Prazo total atingido');
   const next=structuredClone(f.bindings),changes=[];
-  if(request.bindings){if(request.confirmModelChange!==true)throw Error('Autorize a troca dos modelos pendentes');for(const stage of f.stages.filter(s=>s.status!=='COMPLETED')){const b=request.bindings[stage.id];if(!b||typeof b.providerId!=='string'||!b.providerId.trim()||b.providerId==='mock'||typeof b.modelId!=='string'||!b.modelId.trim()||b.modelId.length>180)throw Error('Configure um modelo real para '+stage.name);if(b.providerId!==next[stage.id].providerId||b.modelId!==next[stage.id].modelId)changes.push({role:stage.id,from:next[stage.id],to:{providerId:b.providerId,modelId:b.modelId}});next[stage.id]={providerId:b.providerId,modelId:b.modelId};}}
-  await checkBindings(Object.fromEntries(f.stages.filter(s=>s.status!=='COMPLETED').map(s=>[s.id,next[s.id]])));
+  const pending=f.stages.filter(stage=>stage.status!=='COMPLETED');
+  const replacement=request.replacementBinding;
+  if(replacement!==undefined&&request.bindings!==undefined)throw Error('Escolha uma forma de trocar os modelos');
+  if(replacement!==undefined||request.bindings){
+   if(request.confirmModelChange!==true)throw Error('Autorize a troca dos modelos pendentes');
+   const stages=replacement===undefined?pending:pending.filter(stage=>stage.id===f.stage);
+   for(const stage of stages){
+    const b=replacement===undefined?request.bindings[stage.id]:replacement;
+    if(!b||typeof b.providerId!=='string'||!b.providerId.trim()||b.providerId==='mock'||typeof b.modelId!=='string'||!b.modelId.trim()||b.modelId.length>180)throw Error('Configure um modelo real para '+stage.name);
+    const model={providerId:b.providerId,modelId:b.modelId.trim()};
+    if(model.providerId!==next[stage.id].providerId||model.modelId!==next[stage.id].modelId){
+     changes.push({role:stage.id,from:next[stage.id],to:model});
+     next[stage.id]=model;
+    }
+   }
+  }
+  await checkBindings(Object.fromEntries(pending.map(stage=>[stage.id,next[stage.id]])));
   const initial=contexts.get(id);if(!initial)throw Error('Contexto da sessão não está disponível');
   const fresh=await reserve(projectId,id,{goal:f.goal,paths:f.contextPaths,history:initial.history});
   if(initial.files.some(x=>fresh.files.find(y=>y.path===x.path)?.sha256!==x.sha256)){await release(projectId,id);throw Error('Conflito: arquivos mudaram; faça um novo pedido');}
-  if(changes.length){f.bindings=next;f.bindingHistory=f.bindingHistory||[];f.bindingHistory.push({at:new Date().toISOString(),changes});event(f,'bindings.changed','Troca autorizada dos modelos das etapas pendentes',{changes});}
+  if(changes.length){f.bindings=next;f.bindingHistory=f.bindingHistory||[];f.bindingHistory.push({at:new Date().toISOString(),changes});event(f,'bindings.changed','Troca autorizada de modelo na retomada',{changes});}
   const controller=new AbortController();controllers.set(id,controller);settled.delete(id);f.retries++;f.status='RUNNING';f.canResume=false;f.error=null;f.errorInfo=null;
   event(f,'flow.resumed','Retomada autorizada na etapa '+f.stage,{timeoutMs});
   try{await save(f);}catch(e){await release(projectId,id);controllers.delete(id);settled.add(id);f.status='FAILED';throw e;}

@@ -23,4 +23,4 @@ npm run desktop:package
 
 The icon is generated from `public/ophiuchus-logo.svg`. Packaging copies only the compiled UI, runtime modules and desktop entry point; source credentials, local projects and node_modules are excluded. Build output is ignored by Git. Keep the complete application directory together: the `.exe` needs its adjacent Electron resources.
 
-Use `desktop/install-shortcut.ps1` with the build directory and installation root to create a new version directory and desktop shortcut. The script does not delete old versions. Windows builds are unsigned in this beta and have not yet been validated on a second computer.
+Run `npm run desktop:install` after packaging. It installs the build listed in `desktop-build/latest.json` and updates the existing Ophiuchus shortcut. Close the running app before launching the updated version. The installer keeps prior application directories and the desktop profile. To install another build or use another shortcut, pass `-BuildDirectory`, `-InstallationRoot` or `-ShortcutPath` to `desktop/install-shortcut.ps1`. Windows builds are unsigned in this beta and have not yet been validated on a second computer.

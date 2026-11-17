@@ -13,6 +13,7 @@
     "desktop": "electron .",
     "desktop:icons": "node desktop/create-icon.mjs",
     "desktop:package": "node desktop/package.mjs",
+    "desktop:install": "powershell.exe -NoProfile -File desktop/install-shortcut.ps1",
     "test:desktop": "node --test runtime/desktop-host.test.mjs runtime/desktop-worker.test.mjs"
   },
   "dependencies": {

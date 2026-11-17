@@ -1,6 +1,8 @@
 import {useState} from 'react'
 import {ChevronRight, FolderOpen, History, Search, Trash2} from 'lucide-react'
 import ArtifactMarkdown from './ArtifactMarkdown'
+import DeliverySummary from './DeliverySummary'
+import type {DeliveryStatus} from './DeliverySummary'
 import type {ProjectFlowState} from './ProjectFlow'
 import './chat-history.css'
 
@@ -15,6 +17,7 @@ type ArchivedDraft = {
   id: string
   status: string
   summary: string
+  delivery?: DeliveryStatus
   changes: Array<{path: string; applied: boolean; diff: {tooLarge: boolean; lines: Array<{kind: string; text: string}>}}>
 }
 export type ChatSnapshot = {
@@ -77,6 +80,7 @@ export function SavedProposal({draft}: {draft: ArchivedDraft}) {
   return <details className="history-proposal">
     <summary>Ver proposta salva <span>{draft.changes.length} {draft.changes.length === 1 ? 'arquivo' : 'arquivos'}</span></summary>
     <ArtifactMarkdown text={draft.summary}/>
+    {draft.delivery&&<DeliverySummary status={draft.delivery}/>}
     {draft.changes.map(change => <details className="history-diff" key={change.path}>
       <summary><code>{change.path}</code>{change.applied && <span>Aplicado</span>}</summary>
       {change.diff.tooLarge ? <p>Diff indisponível para este arquivo devido ao tamanho.</p> :
