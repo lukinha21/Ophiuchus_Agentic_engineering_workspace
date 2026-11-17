@@ -73,7 +73,7 @@ export default function App(){
  const [engineeringFilter,setEngineeringFilter]=useState<'all'|'active'|'completed'>('all')
  const [engineeringSelection,setEngineeringSelection]=useState<string|null>(null)
  const uiEpoch=useRef(0)
- const [archive,setArchive]=useState(readChatHistory)
+ const [history,setHistory]=useState(readChatHistory)
  const [storageError,setStorageError]=useState(false)
  const [plainChatId,setPlainChatId]=useState(()=>crypto.randomUUID())
  const [projectChatId,setProjectChatId]=useState<string>()
@@ -82,12 +82,19 @@ export default function App(){
   const first=snapshot.messages.find(message=>message.role==='user')
   if(!first)return
   const title=first.text.trim().replace(/\s+/g,' ').slice(0,85)
-  setArchive(chats=>[{...snapshot,title,updatedAt:new Date().toISOString()},...chats.filter(chat=>chat.id!==snapshot.id)])
+  const updatedAt=new Date().toISOString()
+  setHistory(current=>current.deletedIds.includes(snapshot.id)?current:{
+   ...current,chats:[{...snapshot,title,updatedAt},...current.chats.filter(chat=>chat.id!==snapshot.id)]
+  })
  },[])
+ const deleteChat=(id:string)=>setHistory(current=>({
+  chats:current.chats.filter(chat=>chat.id!==id),
+  deletedIds:current.deletedIds.includes(id)?current.deletedIds:[...current.deletedIds,id]
+ }))
  useEffect(()=>{
-  try{localStorage.setItem(historyKey,JSON.stringify(archive));setStorageError(false)}
+  try{localStorage.setItem(historyKey,JSON.stringify(history));setStorageError(false)}
   catch{setStorageError(true)}
- },[archive])
+ },[history])
  const [chat,setChat]=useState<Array<{role:'user'|'assistant';content:string;error?:boolean}>>([])
  const [submitting,setSubmitting]=useState(false)
  const [cancelling,setCancelling]=useState(false)
@@ -157,7 +164,7 @@ export default function App(){
    <div className="v5-live"><span className={`v5-led ${running?'pulse':''}`}/>{projectStatus.busy?'Trabalhando no projeto':projectStatus.active?projectStatus.name:running?'Execução em tempo real':finished?'Execução concluída':cancelled?'Execução cancelada':'Sistema pronto'}</div>
    <div className="v5-top-actions">{view==='console'&&<><button className="v5-mode-toggle" title={help.modes} onClick={()=>setPref('mode',prefs.mode==='focus'?'engineering':'focus')}><LayoutGrid size={15}/>{prefs.mode==='focus'?'Modo Foco':'Modo Engenharia'}</button></>}</div>
   </header>
-  {view==='history'?<ChatHistory chats={archive} activeIds={[plainChatId,projectChatId||'',activeRunId||'']} storageError={storageError} onBack={()=>setView('console')}/>:view==='dashboard'?<div className="v5-page"><Dashboard onGoConsole={()=>setView('console')}/></div>:view==='settings'?<div className="v5-page"><SettingsCenter agents={agents} onUpdate={updateBinding} onBack={()=>setView('console')}/></div>:<div ref={workspaceRef} style={{'--v6-agents':`${panelSizes.agents}px`,'--v6-inspector':`${panelSizes.inspector}px`} as React.CSSProperties} className={`v5-workspace v6-workspace ${!prefs.sidebar?'no-rail':''} ${effectiveInspector?'with-inspector':''} ${narrow?'v6-narrow':''}`}>
+  {view==='history'?<ChatHistory chats={history.chats} onDelete={deleteChat} activeIds={[plainChatId,projectChatId||'',activeRunId||'']} storageError={storageError} onBack={()=>setView('console')}/>:view==='dashboard'?<div className="v5-page"><Dashboard onGoConsole={()=>setView('console')}/></div>:view==='settings'?<div className="v5-page"><SettingsCenter agents={agents} onUpdate={updateBinding} onBack={()=>setView('console')}/></div>:<div ref={workspaceRef} style={{'--v6-agents':`${panelSizes.agents}px`,'--v6-inspector':`${panelSizes.inspector}px`} as React.CSSProperties} className={`v5-workspace v6-workspace ${!prefs.sidebar?'no-rail':''} ${effectiveInspector?'with-inspector':''} ${narrow?'v6-narrow':''}`}>
    {prefs.sidebar&&<aside className="v5-project-sidebar" ref={setProjectSidebarHost}/>}
    {prefs.sidebar&&!narrow&&<div className="v6-resizer v6-resizer-left" role="separator" aria-orientation="vertical" aria-label="Redimensionar explorador de arquivos" title="Arraste para redimensionar o explorador" onPointerDown={e=>beginResize('agents',e)}/>}
    <section className="v5-center"><div className="v5-console-head"><div className="v5-console-heading"><span className="v5-kicker"><Sparkles size={13}/> CONTEXTO → CONSTRUÇÃO</span><h1>{projectStatus.active?'Trabalho em movimento.':'Dê forma ao próximo passo.'}</h1><p>Uma equipe, um projeto. Cada decisão deixa um registro.</p></div><div className="v5-console-tools">{!projectStatus.active&&<button className="workspace-new-chat" disabled={submitting||cancelling||executingAI||Boolean(runtimeRun&&['RUNNING','WAITING_APPROVAL'].includes(runtimeRun.status))} title={runtimeRun&&['RUNNING','WAITING_APPROVAL'].includes(runtimeRun.status)?'Conclua ou cancele a execução atual antes de abrir outro chat':'Iniciar uma conversa vazia; as execuções anteriores continuam salvas'} onClick={clear}><MessageSquarePlus size={16}/> Novo chat</button>}<span className="v5-demo-pill">RUNTIME LOCAL</span><Tip text={help.console}/>{running&&<button className="v5-stop" onClick={stop}><Square size={12}/> Parar</button>}</div></div>

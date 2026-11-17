@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react'
-import {ChevronRight, FolderOpen, History, Search, Sparkles, UserRound} from 'lucide-react'
+import {ChevronRight, FolderOpen, History, Search, Sparkles, Trash2, UserRound} from 'lucide-react'
 import ArtifactMarkdown from './ArtifactMarkdown'
 import ProjectFlow from './ProjectFlow'
 import RuntimeFlow from './RuntimeFlow'
@@ -33,13 +33,24 @@ export type ChatSnapshot = {
 export type ArchivedChat = ChatSnapshot & {title: string; updatedAt: string}
 export const historyKey = 'ophiuchus.chat-history.v1'
 
-export function readChatHistory(): ArchivedChat[] {
+type StoredHistory = {chats: ArchivedChat[]; deletedIds: string[]}
+
+export function readChatHistory(): StoredHistory {
   try {
-    const stored: unknown = JSON.parse(localStorage.getItem(historyKey) ?? '[]')
-    if (Array.isArray(stored)) return stored.filter(chat => chat && typeof chat.id==='string' &&
-      typeof chat.title==='string' && typeof chat.updatedAt==='string' && Array.isArray(chat.messages))
-  } catch { /* Storage may be disabled or the cache may be invalid. */ }
-  return []
+    const stored = JSON.parse(localStorage.getItem(historyKey) ?? '[]')
+    const chats = Array.isArray(stored) ? stored : stored?.chats
+    const deletedIds: string[] = Array.isArray(stored?.deletedIds)
+      ? stored.deletedIds.filter((id: unknown) => typeof id === 'string')
+      : []
+    return {
+      chats: Array.isArray(chats) ? chats.filter(chat => chat && typeof chat.id==='string' &&
+        typeof chat.title==='string' && typeof chat.updatedAt==='string' && Array.isArray(chat.messages) &&
+        !deletedIds.includes(chat.id)) : [],
+      deletedIds,
+    }
+  } catch {
+    return {chats: [], deletedIds: []}
+  }
 }
 
 export function snapshotFlow(flow: ProjectFlowState): ProjectFlowState {
@@ -64,8 +75,8 @@ function chatStatus(chat: ArchivedChat, active: boolean) {
 const normalize = (text: string) => text.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
 const date = new Intl.DateTimeFormat('pt-BR', {day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'})
 
-export default function ChatHistory({chats, activeIds, storageError, onBack}: {
-  chats: ArchivedChat[]; activeIds: string[]; storageError: boolean; onBack: () => void
+export default function ChatHistory({chats, activeIds, storageError, onBack, onDelete}: {
+  chats: ArchivedChat[]; activeIds: string[]; storageError: boolean; onBack: () => void; onDelete: (id: string) => void
 }) {
   const [query, setQuery] = useState('')
   const [project, setProject] = useState('')
@@ -130,7 +141,15 @@ export default function ChatHistory({chats, activeIds, storageError, onBack}: {
       {selected ? <>
         <header className="history-reader-head">
           <div><h2>{selected.title}</h2><p>{selected.project || 'Sem projeto'} · Consulta</p></div>
-          <button type="button" onClick={onBack}>Voltar ao console</button>
+          <div className="history-reader-actions">
+            <button type="button" className="history-delete" onClick={() => {
+              if (window.confirm('Excluir esta conversa do histórico local?')) {
+                onDelete(selected.id)
+                setSelectedId(undefined)
+              }
+            }}><Trash2 size={14}/> Excluir conversa</button>
+            <button type="button" onClick={onBack}>Voltar ao console</button>
+          </div>
         </header>
         <div className="history-transcript">
           {selected.messages.map((message, index) => {

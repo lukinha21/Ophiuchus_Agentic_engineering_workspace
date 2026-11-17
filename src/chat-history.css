@@ -21,6 +21,9 @@
 .history-reader {min-width:0; min-height:0; overflow:auto; padding:27px clamp(16px,4vw,58px)}
 .history-reader-head {max-width:960px; margin:auto; display:flex; justify-content:space-between; align-items:start; gap:12px; padding-bottom:20px; border-bottom:1px solid color-mix(in srgb,currentColor 14%,transparent)}
 .history-reader-head p {margin:6px 0 0}
+.history-reader-actions {display:flex; justify-content:flex-end; flex-wrap:wrap; gap:8px}
+.history-reader .history-delete {display:inline-flex; align-items:center; gap:6px}
+.history-reader .history-delete:hover {background:var(--studio-danger-bg); border-color:var(--studio-alert); color:var(--studio-alert)}
 .history-reader button:not(.flow-ledger button) {font:inherit; font-size:12px; color:inherit; background:transparent; border:1px solid color-mix(in srgb,currentColor 19%,transparent); border-radius:7px; padding:8px 11px; cursor:pointer}
 .history-transcript {max-width:960px; display:grid; gap:16px; margin:24px auto}
 .history-turn {display:grid; gap:10px; min-width:0}
