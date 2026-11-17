@@ -1,11 +1,7 @@
-import {useEffect, useState} from 'react'
-import {ChevronRight, FolderOpen, History, Search, Sparkles, Trash2, UserRound} from 'lucide-react'
+import {useState} from 'react'
+import {ChevronRight, FolderOpen, History, Search, Trash2} from 'lucide-react'
 import ArtifactMarkdown from './ArtifactMarkdown'
-import ProjectFlow from './ProjectFlow'
-import RuntimeFlow from './RuntimeFlow'
 import type {ProjectFlowState} from './ProjectFlow'
-import {api} from './runtimeClient'
-import type {RuntimeRun} from './runtimeClient'
 import './chat-history.css'
 
 type ArchivedTurn = {
@@ -24,6 +20,8 @@ type ArchivedDraft = {
 export type ChatSnapshot = {
   id: string
   project?: string
+  projectRoot?: string
+  selectedPaths?: string[]
   messages: ArchivedTurn[]
   flows?: ProjectFlowState[]
   drafts?: ArchivedDraft[]
@@ -75,100 +73,56 @@ function chatStatus(chat: ArchivedChat, active: boolean) {
 const normalize = (text: string) => text.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
 const date = new Intl.DateTimeFormat('pt-BR', {day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'})
 
-export default function ChatHistory({chats, activeIds, storageError, onBack, onDelete}: {
-  chats: ArchivedChat[]; activeIds: string[]; storageError: boolean; onBack: () => void; onDelete: (id: string) => void
+export function SavedProposal({draft}: {draft: ArchivedDraft}) {
+  return <details className="history-proposal">
+    <summary>Ver proposta salva <span>{draft.changes.length} {draft.changes.length === 1 ? 'arquivo' : 'arquivos'}</span></summary>
+    <ArtifactMarkdown text={draft.summary}/>
+    {draft.changes.map(change => <details className="history-diff" key={change.path}>
+      <summary><code>{change.path}</code>{change.applied && <span>Aplicado</span>}</summary>
+      {change.diff.tooLarge ? <p>Diff indisponível para este arquivo devido ao tamanho.</p> :
+        <pre>{change.diff.lines.map((line, index) => <span className={'history-line ' + line.kind} key={index}>
+          {line.kind === 'add' ? '+ ' : line.kind === 'remove' ? '− ' : '  '}{line.text}
+        </span>)}</pre>}
+    </details>)}
+  </details>
+}
+
+export default function ChatHistory({chats, activeIds, currentId, storageError, busy, onOpen, onDelete}: {
+  chats: ArchivedChat[]; activeIds: string[]; currentId?: string; storageError: boolean; busy: boolean
+  onOpen: (chat: ArchivedChat) => void; onDelete: (id: string) => void
 }) {
   const [query, setQuery] = useState('')
   const [project, setProject] = useState('')
-  const [selectedId, setSelectedId] = useState<string>()
-  const [run, setRun] = useState<RuntimeRun | null>(null)
-  const [runError, setRunError] = useState(false)
   const projects = [...new Set(chats.flatMap(chat => chat.project ? [chat.project] : []))].sort()
   const visible = chats.filter(chat => normalize(chat.title).includes(normalize(query.trim())) &&
     (!project || (project === 'no-project' ? !chat.project : chat.project === project.slice(8))))
-  const selected = visible.find(chat => chat.id === selectedId) ?? visible[0]
-  const runId = selected?.runId
-  useEffect(() => {
-    let cancelled = false
-    setRun(null)
-    setRunError(false)
-    if (runId) void api<RuntimeRun>('/runs/' + encodeURIComponent(runId)).then(value => {
-      if (!cancelled) setRun(value)
-    }).catch(() => {
-      if (!cancelled) setRunError(true)
-    })
-    return () => { cancelled = true }
-  }, [runId])
 
-  const proposals = (ids: Array<string | null | undefined>) => selected?.drafts?.filter(item => ids.includes(item.id)).map(item =>
-    <details className="history-proposal" key={item.id}>
-      <summary>Ver proposta <span>{item.changes.length} {item.changes.length === 1 ? 'arquivo' : 'arquivos'}</span></summary>
-      <ArtifactMarkdown text={item.summary}/>
-      {item.changes.map(change => <details className="history-diff" key={change.path}>
-        <summary><code>{change.path}</code>{change.applied && <span>Aplicado</span>}</summary>
-        {change.diff.tooLarge ? <p>Diff indisponível para este arquivo devido ao tamanho.</p> :
-          <pre>{change.diff.lines.map((line, index) => <span className={'history-line ' + line.kind} key={index}>
-            {line.kind === 'add' ? '+ ' : line.kind === 'remove' ? '− ' : '  '}{line.text}
-          </span>)}</pre>}
-      </details>)}
-    </details>)
-
-  return <section className="chat-history" aria-label="Histórico de conversas">
-    <aside className="history-list">
-      <header><History size={19}/><h1>Histórico</h1></header>
-      <div className="history-filters">
-        <div className="history-search"><Search size={15}/><input aria-label="Buscar conversas" placeholder="Buscar por título" value={query} onChange={event => setQuery(event.target.value)}/></div>
-        <select aria-label="Filtrar por projeto" value={project} onChange={event => setProject(event.target.value)}>
-          <option value="">Todos os projetos</option><option value="no-project">Sem projeto</option>
-          {projects.map(name => <option value={'project:' + name} key={name}>{name}</option>)}
-        </select>
-      </div>
-      <ul>
-        {visible.map(chat => {
-          const status = chatStatus(chat, activeIds.includes(chat.id))
-          return <li key={chat.id}><button type="button" aria-current={selected?.id === chat.id ? 'true' : undefined} onClick={() => setSelectedId(chat.id)}>
+  return <section className="history-list" aria-label="Histórico de conversas">
+    <header><History size={17}/><h1>Histórico</h1></header>
+    <div className="history-filters">
+      <div className="history-search"><Search size={15}/><input aria-label="Buscar conversas" placeholder="Buscar por título" value={query} onChange={event => setQuery(event.target.value)}/></div>
+      <select aria-label="Filtrar por projeto" value={project} onChange={event => setProject(event.target.value)}>
+        <option value="">Todos os projetos</option><option value="no-project">Sem projeto</option>
+        {projects.map(name => <option value={'project:' + name} key={name}>{name}</option>)}
+      </select>
+    </div>
+    {storageError && <p role="alert" className="history-error">Não foi possível salvar o histórico local.</p>}
+    <ul>
+      {visible.map(chat => {
+        const status = chatStatus(chat, activeIds.includes(chat.id))
+        return <li key={chat.id}>
+          <button className="history-open" type="button" disabled={busy} aria-current={currentId === chat.id ? 'true' : undefined} onClick={() => onOpen(chat)}>
             <strong>{chat.title}</strong><ChevronRight size={15}/>
             <span><FolderOpen size={13}/>{chat.project || 'Sem projeto'}</span>
             <time dateTime={chat.updatedAt}>{date.format(new Date(chat.updatedAt))}</time>
             {status && <small>{status}</small>}
-          </button></li>
-        })}
-      </ul>
-      {!visible.length && <p className="history-empty">{chats.length ? 'Nenhuma conversa corresponde à busca.' : 'Suas conversas aparecerão aqui.'}</p>}
-    </aside>
-    <div className="history-reader">
-      {storageError && <p role="alert" className="history-error">Não foi possível salvar o histórico no armazenamento local.</p>}
-      {selected ? <>
-        <header className="history-reader-head">
-          <div><h2>{selected.title}</h2><p>{selected.project || 'Sem projeto'} · Consulta</p></div>
-          <div className="history-reader-actions">
-            <button type="button" className="history-delete" onClick={() => {
-              if (window.confirm('Excluir esta conversa do histórico local?')) {
-                onDelete(selected.id)
-                setSelectedId(undefined)
-              }
-            }}><Trash2 size={14}/> Excluir conversa</button>
-            <button type="button" onClick={onBack}>Voltar ao console</button>
-          </div>
-        </header>
-        <div className="history-transcript">
-          {selected.messages.map((message, index) => {
-            const flow = selected.flows?.find(item => item.id === message.flowId)
-            const stage = flow && ['RUNNING','CANCELLING'].includes(flow.status) && !activeIds.includes(selected.id) ? {...flow,status:'FAILED',error:'Execução interrompida.'} : flow
-            const draftAppearsLater = flow?.draftId && selected.messages.some(turn => turn.draftId === flow.draftId)
-            return <div className="history-turn" key={index}>
-              <div className={'history-message ' + message.role}>
-                <span className="history-avatar">{message.role === 'user' ? <UserRound size={16}/> : <Sparkles size={16}/>}</span>
-                <div><strong>{message.role === 'user' ? 'Você' : 'Ophiuchus'}</strong><ArtifactMarkdown text={message.text}/></div>
-              </div>
-              {stage && <ProjectFlow flow={stage}/>}
-              {proposals([message.draftId, draftAppearsLater ? undefined : flow?.draftId])}
-            </div>
-          })}
-          {run?.id === runId && run && <RuntimeFlow run={run} engineering={false}/>}
-          {runId && run?.id !== runId && <p role="status">{runError ? 'Os detalhes da execução estão indisponíveis.' : 'Carregando execução…'}</p>}
-        </div>
-      </> : <div className="history-blank"><History size={32}/><p>{chats.length ? 'Ajuste os filtros para abrir uma conversa.' : 'Inicie uma conversa no console para criar seu histórico.'}</p><button onClick={onBack}>Ir ao console</button></div>}
-    </div>
+          </button>
+          <button className="history-delete" type="button" aria-label={'Excluir conversa: ' + chat.title} title="Excluir conversa" onClick={() => {
+            if (window.confirm('Excluir esta conversa do histórico local?')) onDelete(chat.id)
+          }}><Trash2 size={14}/></button>
+        </li>
+      })}
+    </ul>
+    {!visible.length && <p className="history-empty">{chats.length ? 'Nenhuma conversa corresponde à busca.' : 'Suas conversas aparecerão aqui.'}</p>}
   </section>
 }

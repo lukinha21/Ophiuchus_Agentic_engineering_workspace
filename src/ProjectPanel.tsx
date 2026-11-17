@@ -11,8 +11,8 @@ import WorkspaceArea from './WorkspaceArea'
 import type {WorkspaceView} from './WorkspaceArea'
 import type {ProjectFlowState} from './ProjectFlow'
 import ProjectInspector from './ProjectInspector'
-import {snapshotFlow} from './ChatHistory'
-import type {ChatSnapshot} from './ChatHistory'
+import {SavedProposal,snapshotFlow} from './ChatHistory'
+import type {ArchivedChat,ChatSnapshot} from './ChatHistory'
 type Turn={id:string;role:'user'|'assistant';text:string;error?:boolean;draftId?:string;flowId?:string}
 type FileInfo={path:string;bytes:number}
 type Project={id:string;root:string;name:string;files:FileInfo[];warnings:string[];drafts?:Array<{id:string;summary:string;status:string;createdAt:string}>}
@@ -23,10 +23,10 @@ function FileTree({files,selected,onSelect,onOpen,prefix='',depth=0}:{files:File
  const direct=files.filter(f=>!f.path.slice(prefix.length).includes('/'))
  return <div className="project-tree-level">{[...folders].sort().map(folder=><details key={folder} open={depth<1}><summary><FolderOpen size={14}/>{folder}</summary><FileTree files={files.filter(f=>f.path.startsWith(prefix+folder+'/'))} selected={selected} onSelect={onSelect} onOpen={onOpen} prefix={prefix+folder+'/'} depth={depth+1}/></details>)}{direct.map(f=><div className="project-file" key={f.path}><label title={'Incluir no contexto: '+f.path}><input type="checkbox" checked={selected.includes(f.path)} onChange={()=>onSelect(f.path)}/><FileCode2 size={14}/><span>{f.path.slice(prefix.length)}</span></label><button aria-label={'Ler '+f.path} title={'Ler '+f.path} onClick={()=>onOpen(f.path)}><Eye size={14}/></button></div>)}</div>
 }
-export type ProjectHandle={submit:(goal:string)=>Promise<boolean>;openFolder:()=>Promise<boolean>}
+export type ProjectHandle={submit:(goal:string)=>Promise<boolean>;openFolder:()=>Promise<boolean>;openChat:(saved:ArchivedChat|null)=>Promise<void>}
 export type ProjectStatus={active:boolean;name:string;busy:boolean;canSend:boolean}
-type Props={onArchive?: (snapshot:ChatSnapshot)=>void;agents:AgentDefinition[];onSettings:()=>void;sidebarTarget:HTMLElement|null;workTarget:HTMLElement|null;onStatus:(status:ProjectStatus)=>void;onNewChat:()=>void;engineering:boolean;inspectorTarget:HTMLElement|null;onInspect:()=>void;onCloseInspector:()=>void;disabled?:boolean}
-const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({onArchive,agents,onSettings,sidebarTarget,workTarget,onStatus,onNewChat,engineering,inspectorTarget,onInspect,onCloseInspector,disabled=false},ref){
+type Props={onExplorer:()=>void;onArchive?: (snapshot:ChatSnapshot)=>void;agents:AgentDefinition[];onSettings:()=>void;sidebarTarget:HTMLElement|null;workTarget:HTMLElement|null;onStatus:(status:ProjectStatus)=>void;onNewChat:()=>void;engineering:boolean;inspectorTarget:HTMLElement|null;onInspect:()=>void;onCloseInspector:()=>void;disabled?:boolean}
+const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({onExplorer,onArchive,agents,onSettings,sidebarTarget,workTarget,onStatus,onNewChat,engineering,inspectorTarget,onInspect,onCloseInspector,disabled=false},ref){
  const [workspaceView,setWorkspaceView]=useState<WorkspaceView>('files')
  const [path,setPath]=useState(''),[readAllowed,setReadAllowed]=useState(false),[project,setProject]=useState<Project|null>(null)
  const [selected,setSelected]=useState<string[]>([]),[preview,setPreview]=useState<{path:string;content:string}|null>(null)
@@ -34,7 +34,8 @@ const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({onArch
  const [contractFormat,setContractFormat]=useState<'auto'|'prompt'>('auto'),[cachePolicy,setCachePolicy]=useState<'provider'|'explicit'>('provider')
  const [mode,setMode]=useState<'auto'|'orchestrate'|'analyse'|'propose'>('auto'),[sendAllowed,setSendAllowed]=useState(false)
  const [writeAllowed,setWriteAllowed]=useState(false),[executeAllowed,setExecuteAllowed]=useState(false)
- const [chatId,setChatId]=useState(()=>crypto.randomUUID())
+ const [pendingChat,setPendingChat]=useState<ArchivedChat|null>(null)
+ const [chatId,setChatId]=useState<string>(()=>crypto.randomUUID())
  const archivedDrafts=useRef(new Map<string,NonNullable<ChatSnapshot['drafts']>[number]>())
  const [messages,setMessages]=useState<Turn[]>([]);const endRef=useRef<HTMLDivElement>(null);const taskLock=useRef(false)
  const [contextPaths,setContextPaths]=useState<string[]>([]),[usage,setUsage]=useState<number|null>(null)
@@ -45,11 +46,43 @@ const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({onArch
  const [manual,setManual]=useState(false),[picking,setPicking]=useState(false)
  const developer=agents.find(a=>a.role==='DEVELOPER'&&a.enabled),binding=developer?.modelBinding
  const action=async(label:string,fn:()=>Promise<void>)=>{if(busy)return false;setBusy(label);setError('');try{await fn();return true}catch(e){setError((e as Error).message);return false}finally{setBusy('')}}
- const adopt=(p:Project)=>{setChatId(crypto.randomUUID());archivedDrafts.current.clear();setInspection(null);setFlows({});setActiveFlowId(null);finishedFlows.current.clear();setProject(p);setSelected([]);setPreview(null);setDraft(null);setMessages([]);setHits([]);setContextPaths([]);setUsage(null);setSendAllowed(false);setWriteAllowed(false);setExecuteAllowed(false);setManual(false);setPath('')}
- const open=()=>action('Abrindo pasta',async()=>{adopt(await api<Project>('/projects/open',{path:path.trim(),confirmRead:readAllowed}))})
+ const adopt=(p:Project)=>{setPendingChat(null);setChatId(crypto.randomUUID());archivedDrafts.current.clear();setInspection(null);setFlows({});setActiveFlowId(null);finishedFlows.current.clear();setProject(p);setSelected([]);setPreview(null);setDraft(null);setMessages([]);setHits([]);setContextPaths([]);setUsage(null);setSendAllowed(false);setWriteAllowed(false);setExecuteAllowed(false);setManual(false);setPath('')}
+ const loadArchive=(saved:ArchivedChat,p:Project|null)=>{
+  setPendingChat(p?null:saved);setProject(p);setChatId(saved.id);setInspection(null);setActiveFlowId(null)
+  setFlows(Object.fromEntries((saved.flows||[]).map(flow=>{
+   const interrupted=['RUNNING','CANCELLING'].includes(flow.status)
+   return [flow.id,interrupted?{...flow,status:'FAILED',canResume:false,error:'Execução interrompida.'}:flow]
+  })))
+  archivedDrafts.current=new Map((saved.drafts||[]).map(item=>[item.id,item]))
+  setMessages(saved.messages.map(message=>({...message,id:crypto.randomUUID()})))
+  setDraft(null);setPreview(null);setHits([]);setQuery('');setContextPaths([]);setUsage(null);setWorkspaceView('files')
+  setSelected(p?(saved.selectedPaths||[]).filter(file=>p.files.some(item=>item.path===file)):[])
+  setSendAllowed(false);setWriteAllowed(false);setExecuteAllowed(false);setManual(false);setReadAllowed(false);setPath('')
+ }
+ const openChat=async(saved:ArchivedChat|null)=>{
+  if(busy||taskLock.current)throw Error('Aguarde o trabalho deste chat terminar antes de trocar de conversa.')
+  if(saved&&project&&saved.projectRoot===project.root){loadArchive(saved,project);return}
+  if(project)await api(`/projects/${project.id}/close`,{})
+  setError('')
+  if(saved)loadArchive(saved,null)
+  else{setProject(null);setPendingChat(null);setMessages([]);setDraft(null);setFlows({});setActiveFlowId(null)}
+ }
+ const adoptFolder=async(p:Project)=>{
+  if(!pendingChat){adopt(p);return}
+  if(pendingChat.projectRoot ? p.root!==pendingChat.projectRoot : p.name!==pendingChat.project){
+   await api(`/projects/${p.id}/close`,{})
+   throw Error('Selecione a pasta do projeto desta conversa: '+pendingChat.project)
+  }
+  loadArchive(pendingChat,p)
+ }
+ const authorizeSavedFolder=()=>action('Reabrindo a pasta do projeto',async()=>{
+  if(!pendingChat?.projectRoot)return
+  await adoptFolder(await api<Project>('/projects/open',{path:pendingChat.projectRoot,confirmRead:true}))
+ })
+ const open=()=>action('Abrindo pasta',async()=>{await adoptFolder(await api<Project>('/projects/open',{path:path.trim(),confirmRead:readAllowed}))})
  const pick=()=>action('Escolha a pasta na janela do Windows',async()=>{
   if(disabled)throw Error('Conclua ou cancele a execução atual antes de abrir um projeto');
-  setPicking(true);try{const result=await api<Project&{cancelled?:boolean}>('/projects/pick',{confirmRead:true});if(!result.cancelled)adopt(result)}catch(e){setManual(true);throw e}finally{setPicking(false)}
+  setPicking(true);try{const result=await api<Project&{cancelled?:boolean}>('/projects/pick',{confirmRead:true});if(!result.cancelled)await adoptFolder(result)}catch(e){setManual(true);throw e}finally{setPicking(false)}
  })
  const cancelPicker=async()=>{try{await api('/projects/picker/cancel',{});setManual(true)}catch(e){setError((e as Error).message)}};
  const close=()=>action('Fechando projeto',async()=>{if(!project)return;await api(`/projects/${project.id}/close`,{});setProject(null);try{sessionStorage.removeItem('ophiuchus.local-project')}catch{}setPath('');setReadAllowed(false);setSelected([]);setPreview(null);setDraft(null);setMessages([]);setQuery('');setHits([]);setSendAllowed(false);setWriteAllowed(false);setExecuteAllowed(false);setContextPaths([]);setUsage(null)})
@@ -99,10 +132,12 @@ const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({onArch
     setFlows(old=>({...old,[flow.id]:flow}));
     if(!['RUNNING','CANCELLING'].includes(flow.status)){
      if(!finishedFlows.current.has(flow.id)){
+      const proposal=flow.draftId?await api<Draft>(`/projects/${project.id}/drafts/${flow.draftId}`):null;
+      if(!alive)return;
       finishedFlows.current.add(flow.id);
+      if(proposal)setDraft(proposal);
       if(flow.status==='READY')setMessages(old=>[...old,{id:crypto.randomUUID(),role:'assistant',text:flow.summary,draftId:flow.draftId||undefined}]);
       setContextPaths(flow.contextPaths);const tokens=flow.stages.map(s=>s.usage?.total_tokens);setUsage(tokens.every(x=>typeof x==='number')?tokens.reduce<number>((a,b)=>a+(b||0),0):null);
-      if(flow.draftId){const draft=await api<Draft>(`/projects/${project.id}/drafts/${flow.draftId}`);if(alive)setDraft(draft);}
      }
      if(alive){setActiveFlowId(null);setBusy('');taskLock.current=false;}return;
     }
@@ -113,12 +148,12 @@ const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({onArch
  const cancelFlow=async(id:string)=>{if(!project)return;try{const flow=await api<ProjectFlowState>(`/projects/${project.id}/flows/${id}/cancel`,{});setFlows(old=>({...old,[id]:flow}));}catch(e){setError((e as Error).message)}};
  const resumeFlow=async(flowId:string,timeoutMs:number,useCurrentModels=false)=>{
   if(!project||busy||taskLock.current)return;taskLock.current=true;setBusy('Retomando etapa');setError('');
-  try{const flow=await api<ProjectFlowState>(`/projects/${project.id}/flows/${flowId}/resume`,{confirmSend:true,timeoutMs,...(useCurrentModels?{confirmModelChange:true,bindings:Object.fromEntries(agents.filter(a=>a.enabled).map(a=>[a.role.toLowerCase(),{providerId:a.modelBinding.providerId,modelId:a.modelBinding.modelId}]))}:{})});finishedFlows.current.delete(flowId);setFlows(old=>({...old,[flowId]:flow}));setInspection({flowId,stageId:null});setActiveFlowId(flowId);}
+  try{const flow=await api<ProjectFlowState>(`/projects/${project.id}/flows/${flowId}/resume`,{confirmSend:true,timeoutMs,...(flows[flowId]?.projectId&&flows[flowId].projectId!==project.id?{savedProjectId:flows[flowId].projectId}:{}),...(useCurrentModels?{confirmModelChange:true,bindings:Object.fromEntries(agents.filter(a=>a.enabled).map(a=>[a.role.toLowerCase(),{providerId:a.modelBinding.providerId,modelId:a.modelBinding.modelId}]))}:{})});finishedFlows.current.delete(flowId);setFlows(old=>({...old,[flowId]:flow}));setInspection({flowId,stageId:null});setActiveFlowId(flowId);}
   catch(e){setError((e as Error).message);setBusy('');taskLock.current=false;}
  };
  const inspect=(flowId:string,stageId:string)=>{setInspection({flowId,stageId});onInspect()};
  const showDraft=(id:string)=>{setWorkspaceView('files');void action('Abrindo proposta',async()=>{if(project){setDraft(await api(`/projects/${project.id}/drafts/${id}`));setWriteAllowed(false);setExecuteAllowed(false)}})};
- const newChat=()=>{if(busy||taskLock.current)return;onNewChat();setChatId(crypto.randomUUID());archivedDrafts.current.clear();setMessages([]);setWorkspaceView('files');setDraft(null);setContextPaths([]);setUsage(null);setError('');setPreview(null);setHits([]);setWriteAllowed(false);setExecuteAllowed(false)}
+ const newChat=()=>{if(busy||taskLock.current)return;onNewChat();setPendingChat(null);setChatId(crypto.randomUUID());archivedDrafts.current.clear();setMessages([]);setWorkspaceView('files');setDraft(null);setContextPaths([]);setUsage(null);setError('');setPreview(null);setHits([]);setWriteAllowed(false);setExecuteAllowed(false)}
  useEffect(()=>{endRef.current?.scrollIntoView({block:'nearest',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})},[messages,busy,activeFlowId?flows[activeFlowId]?.stage:null])
 
  const modify=(path:string,kind:'apply'|'undo')=>action(kind==='apply'?'Aplicando arquivo revisado':'Desfazendo alteração',async()=>{if(!project||!draft)return;setDraft(await api(`/projects/${project.id}/drafts/${draft.id}/${kind}`,{path,confirmWrite:writeAllowed}));setPreview(null);const p=await api<{files:FileInfo[];warnings:string[]}>(`/projects/${project.id}/tree`);setProject({...project,...p})})
@@ -135,17 +170,39 @@ const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({onArch
    id:draft.id,status:draft.status,summary:draft.summary,
    changes:draft.changes.map(({path,applied,diff})=>({path,applied,diff}))
   })
-  onArchive({id:chatId,project:project.name,messages,flows:chatFlows,drafts:[...archivedDrafts.current.values()]})
- },[chatId,draft,flows,messages,onArchive,project?.id,project?.name])
- useImperativeHandle(ref,()=>({submit:task,openFolder:pick}))
+  onArchive({id:chatId,project:project.name,projectRoot:project.root,selectedPaths:selected,messages,flows:chatFlows,drafts:[...archivedDrafts.current.values()]})
+ },[chatId,draft,flows,messages,onArchive,project?.id,project?.name,project?.root,selected])
+ useImperativeHandle(ref,()=>({submit:task,openFolder:pick,openChat}))
  const canSend=Boolean(project&&!busy)
  const draftFlow=draft?.workflowId?flows[draft.workflowId]:null;const canApplyDraft=!draft?.workflowId||(draftFlow?.status==='READY'&&draftFlow.draftId===draft.id)
- useEffect(()=>onStatus({active:Boolean(project),name:project?.name||'',busy:Boolean(busy),canSend}),[project?.id,project?.name,busy,canSend,onStatus])
+ useEffect(()=>onStatus({active:Boolean(project||pendingChat),name:project?.name||pendingChat?.project||'',busy:Boolean(busy),canSend}),[project?.id,project?.name,pendingChat,busy,canSend,onStatus])
  const inspectFlow=inspection?flows[inspection.flowId]||null:activeFlowId?flows[activeFlowId]:Object.values(flows).at(-1)||null;
  const inspector=engineering?<ProjectInspector flows={Object.values(flows)} flow={inspectFlow} stageId={inspection?.stageId||null} onFlow={flowId=>setInspection({flowId,stageId:null})} onStage={stageId=>{if(inspectFlow)setInspection({flowId:inspectFlow.id,stageId})}} onClose={onCloseInspector}/>:null
  const sidebar=<section className="local-project project-rail" aria-label="Arquivos do projeto"><div className="project-rail-heading"><span>EXPLORADOR</span>{project&&<div><button title="Atualizar arquivos" disabled={Boolean(busy)} onClick={()=>void refresh()}><RefreshCw size={14}/></button><button title="Fechar projeto" disabled={Boolean(busy)} onClick={()=>void close()}><X size={14}/></button></div>}</div>
  {!project?<div className="project-rail-empty"><span className="rail-index">01 / PONTO DE PARTIDA</span><h2>Um lugar para<br/>construir.</h2><p>Abra um projeto existente.<br/>O contexto começa nos seus arquivos.</p><button className="project-open-native" disabled={disabled||Boolean(busy)} onClick={()=>void pick()} title="Escolher uma pasta no Windows e autorizar sua leitura local"><FolderOpen size={18}/> {picking?'Selecionando…':'Abrir pasta'}</button>{picking&&<div className="project-picker-note"><p>Escolha a pasta na janela gráfica do Windows. O console permanece oculto.</p><button onClick={()=>void cancelPicker()}>Cancelar seletor e informar caminho</button></div>}<button className="project-manual-toggle" onClick={()=>setManual(x=>!x)} disabled={Boolean(busy)||disabled}>{manual?'Ocultar caminho':'Informar caminho manualmente'}</button>{manual&&<div className="project-manual"><label>Caminho local<input aria-label="Caminho da pasta do projeto" value={path} onChange={e=>setPath(e.target.value)} placeholder="Caminho absoluto da pasta"/></label><label className="project-check"><input type="checkbox" checked={readAllowed} onChange={e=>setReadAllowed(e.target.checked)}/> Autorizo a leitura desta pasta.</label><button disabled={!path.trim()||!readAllowed||Boolean(busy)||disabled} onClick={()=>void open()}>Abrir pelo caminho</button></div>}</div>:<><div className="project-root-name" title={project.root}><FolderOpen size={15}/><strong>{project.name}</strong></div><div className="project-rail-search"><input aria-label="Buscar no projeto" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar nos arquivos…" onKeyDown={e=>{if(e.key==='Enter'&&query.length>=2&&!busy)void search()}}/><button aria-label="Buscar arquivos" disabled={query.length<2||Boolean(busy)} onClick={()=>void search()}><Search size={15}/></button></div><div className="project-rail-files"><FileTree files={project.files} selected={selected} onSelect={select} onOpen={read}/></div><div className="project-rail-footer">{project.files.length} arquivos · {selected.length?`${selected.length} no contexto`:'contexto automático'}<small title="Dependências, builds, links e nomes sensíveis comuns são excluídos.">Leitura autorizada somente nesta pasta</small></div></>}
  {busy&&<p className="project-rail-busy" role="status">{busy}…</p>}</section>
+ const savedDraftFor=(message:Turn)=>{
+  const flow=message.flowId?flows[message.flowId]:undefined
+  return archivedDrafts.current.get(message.draftId||(flow?.draftId&&!messages.some(turn=>turn.draftId===flow.draftId)?flow.draftId:'')||'')
+ }
+ const thread=messages.map(message=>{
+  const flow=message.flowId?flows[message.flowId]:undefined
+  const savedDraft=savedDraftFor(message)
+  const currentGrant=Boolean(project&&flow?.projectId===project.id)
+  return <Fragment key={message.id}><div className={'v5-chat-line '+message.role}>
+   <div className={'v5-chat-avatar '+message.role}>{message.role==='user'?<UserRound size={22}/>:<Sparkles size={22}/>}</div>
+   <div className={'project-message '+(message.error?'project-message-error':'')}><span className="v5-chat-by">{message.role==='user'?'Você':'Ophiuchus'}</span>
+    <ArtifactMarkdown text={message.text}/>
+    {project&&message.draftId&&(!savedDraft||project.drafts?.some(item=>item.id===message.draftId)||Object.values(flows).some(item=>item.draftId===message.draftId&&item.projectId===project.id))&&<button disabled={Boolean(busy)} onClick={()=>showDraft(message.draftId!)}><GitCompareArrows size={14}/> Revisar proposta</button>}
+   </div>
+  </div>
+  {flow&&<ProjectFlow flow={flow} onCancel={currentGrant?()=>void cancelFlow(flow.id):undefined}
+   onDraft={currentGrant?showDraft:undefined} engineering={engineering&&currentGrant}
+   onInspect={currentGrant?stageId=>inspect(flow.id,stageId):undefined}
+   onResume={project&&!busy?(timeout,rebind)=>void resumeFlow(flow.id,timeout,rebind):undefined}/>}
+  {savedDraft&&<SavedProposal draft={savedDraft}/>}
+  </Fragment>
+ })
  const work=project?<section className="local-project project-in-console" aria-label="Contexto e alterações do projeto">
  <div className="project-context-bar"><FolderOpen size={16}/><strong>{project.name}</strong><span>{mode==='auto'?'Modo automático':mode==='orchestrate'?'Equipe de 6 agentes':mode==='analyse'?'Análise direta':'Edição direta'} · {selected.length?`${selected.length} arquivos marcados`:'Contexto automático'}</span><button disabled={Boolean(busy)} onClick={newChat} title="Limpar a conversa; manter a pasta e os arquivos"><MessageSquarePlus size={15}/> Novo chat</button><button onClick={onSettings} title="Configurar modelo"><Settings2 size={14}/></button></div>
  <details className="project-console-permission" open={!sendAllowed}><summary>Contexto e permissões</summary><div className="project-task-modes"><button disabled={Boolean(busy)} className={mode==='auto'?'selected':''} onClick={()=>{setMode('auto');setSendAllowed(false)}}>Automático</button><button disabled={Boolean(busy)} className={mode==='orchestrate'?'selected':''} onClick={()=>{setMode('orchestrate');setSendAllowed(false)}}>Equipe completa · 6 agentes</button><button disabled={Boolean(busy)} className={mode==='analyse'?'selected':''} onClick={()=>{setMode('analyse');setSendAllowed(false)}}>Analisar</button><button disabled={Boolean(busy)} className={mode==='propose'?'selected':''} onClick={()=>{setMode('propose');setSendAllowed(false)}}>Edição direta</button></div><small>{mode==='orchestrate'?'Seis agentes em sequência, até 7 chamadas por pedido (inclui uma recuperação). Revisão e QA estáticos; testes separados. ':''}Modelo do Desenvolvedor: {binding?.providerId||'não configurado'} / {binding?.modelId||'selecione um modelo'}. Até 8 arquivos e 24.000 caracteres de conteúdo por pedido. Dependências e arquivos sensíveis comuns são excluídos.</small><div className="project-task-modes"><label>Passagem entre agentes<select disabled={Boolean(busy)} value={contractFormat} onChange={e=>setContractFormat(e.target.value as 'auto'|'prompt')}><option value="auto">Automática por capacidade do modelo</option><option value="prompt">Compatibilidade máxima · JSON validado localmente</option></select></label><label>Cache<select disabled={Boolean(busy)} value={cachePolicy} onChange={e=>setCachePolicy(e.target.value as 'provider'|'explicit')}><option value="provider">Gerenciado pelo provedor</option><option value="explicit">Solicitar cache explícito quando compatível</option></select></label></div><small>Os contratos são validados em todos os provedores. Cache explícito é opcional e pode ter cobrança de gravação. Os modelos escolhidos por agente são preservados.</small><label className="project-check"><input type="checkbox" checked={sendAllowed} onChange={e=>setSendAllowed(e.target.checked)}/> Autorizo o envio do pedido e do contexto aos modelos do modo selecionado, incluindo até 7 chamadas na equipe completa. Escrita e testes continuam exigindo aprovação separada.</label></details>
@@ -154,7 +211,7 @@ const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({onArch
  <div className="project-chat-thread" aria-label="Conversa do projeto" aria-live="polite">
 
  {!messages.length&&<div className="project-chat-empty"><Sparkles size={24}/><h2>O próximo passo começa aqui.</h2><p>Descreva a mudança. A equipe define o caminho, prepara uma proposta e confere os critérios. Você acompanha cada etapa e decide o que entra no projeto.</p></div>}
- {messages.map(m=><Fragment key={m.id}><div className={'v5-chat-line '+(m.role==='user'?'user':'assistant')}><div className={'v5-chat-avatar '+m.role}>{m.role==='user'?<UserRound size={22}/>:<Sparkles size={22}/>}</div><div className={'project-message '+(m.error?'project-message-error':'')}><span className="v5-chat-by">{m.role==='user'?'Você':'Ophiuchus'}</span><ArtifactMarkdown text={m.text}/>{m.draftId&&<button disabled={Boolean(busy)} onClick={()=>showDraft(m.draftId!)}><GitCompareArrows size={14}/> Revisar proposta</button>}</div></div>{m.flowId&&flows[m.flowId]&&<ProjectFlow flow={flows[m.flowId]} onCancel={()=>void cancelFlow(m.flowId!)} onDraft={showDraft} engineering={engineering} onInspect={stageId=>inspect(m.flowId!,stageId)} onResume={busy?undefined:(timeout,rebind)=>void resumeFlow(m.flowId!,timeout,rebind)}/>}</Fragment>)}
+ {thread}
  {busy&&taskLock.current&&!activeFlowId&&<div className="project-working" role="status"><LoaderCircle size={19}/><div><strong>Ophiuchus está trabalhando</strong><span>{busy}…</span></div><span className="project-thinking-dots">•••</span></div>}
  <div className="project-chat-end" ref={endRef}/></div>
     {contextPaths.length>0&&<details className="project-context"><summary>Arquivos enviados ao modelo ({contextPaths.length})</summary>{contextPaths.map(p=><code key={p}>{p}</code>)}</details>}
@@ -167,6 +224,10 @@ const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({onArch
  </WorkspaceArea>
 
  {project.warnings.length>0&&<details className="project-warnings"><summary>Arquivos omitidos / avisos ({project.warnings.length})</summary>{project.warnings.map((w,i)=><p key={i}>{w}</p>)}</details>}
+ </section>:pendingChat?<section className="local-project project-in-console" aria-label="Conversa do projeto">
+  <div className="project-context-bar"><FolderOpen size={16}/><strong>{pendingChat.project}</strong><span>Pasta aguardando autorização</span><button disabled={Boolean(busy)} onClick={newChat}><MessageSquarePlus size={15}/> Novo chat</button></div>
+  <div className="history-project-access"><p>Autorize a leitura da pasta para continuar trabalhando neste projeto.</p>{pendingChat.projectRoot?<button disabled={Boolean(busy)} onClick={()=>void authorizeSavedFolder()}>Autorizar leitura e reabrir pasta</button>:<button onClick={onExplorer}>Escolher pasta no Explorador</button>}</div>
+  <div className="project-chat-thread">{thread}</div>
  </section>:null
  return <>{error&&createPortal(<div className="project-toast" role="alert"><AlertCircle size={23}/><div><strong>Não foi possível concluir</strong><p>{error}</p></div><button aria-label="Fechar aviso" onClick={()=>setError('')}><X size={18}/></button></div>,document.body)}{sidebarTarget&&createPortal(sidebar,sidebarTarget)}{workTarget&&createPortal(work,workTarget)}{engineering&&inspectorTarget&&createPortal(inspector,inspectorTarget)}</>
 })
