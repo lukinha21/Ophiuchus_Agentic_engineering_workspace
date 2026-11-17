@@ -140,8 +140,8 @@ OpenAI, Google Gemini, Anthropic, OpenRouter, endpoints compatíveis com OpenAI 
 **Requisitos:** Node.js 20.19+ ou 22.12+ (exigência do Vite 7) e, para executar testes dos projetos, Docker.
 
 ```bash
-git clone https://github.com/lukinha21/Ophiuchus_Agentic_engineering_workspace.git
-cd Ophiuchus_Agentic_engineering_workspace
+git clone https://github.com/lukinha21/ophiuchus-agentic-console.git
+cd ophiuchus-agentic-console
 npm ci
 ```
 
