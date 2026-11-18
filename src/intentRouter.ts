@@ -25,17 +25,57 @@ function answerProductQuestion(question: string) {
 
 type HistoryTurn = {role: 'user' | 'assistant'; content: string}
 
+const resendQuestion = 'O que você quer que eu mande novamente?'
+const continuationQuestion = 'O que você quer continuar? Indique a conversa, a proposta ou o próximo passo.'
+const correctionQuestion = 'Qual erro você quer corrigir? Mande a mensagem de erro ou indique o arquivo.'
+const scopeQuestion = 'O que você quer que eu faça com isso? Posso explicar, analisar ou propor uma alteração.'
+const clarificationMessages = new Set([resendQuestion, continuationQuestion, correctionQuestion, scopeQuestion])
+
+function resolveContinuation(text: string, history: HistoryTurn[], inProject: boolean) {
+  const latest = history.at(-1)
+  const asksToResend = /^(?:pode |voce pode )?(?:(?:me )?(?:manda|mande|mandar|envie|envia|enviar|reenvie|reenvia|reenviar|repita|repete|repetir|mostre|mostra|mostrar)(?:\s+(?:isso|isto|ele|ela|a (?:ultima )?resposta))?\s+(?:novamente|de novo|outra vez)|(?:me )?(?:reenvie|reenvia|repita|repete)(?:\s+(?:isso|a (?:ultima )?resposta))?|de novo|novamente)(?: por favor)?$/.test(text)
+  const confirmsGuide = latest?.role === 'assistant' && latest.content === resendQuestion &&
+    /^(?:o guia|o manual|a documentacao)(?: (?:complet[ao]|do ophiuchus))?$/.test(text)
+  const requestsGuideAgain = /^(?:me )?(?:manda|mande|envie|reenvie|repita) (?:de novo |novamente )?(?:o guia|o manual|a documentacao) (?:complet[ao] )?(?:do ophiuchus|de novo|novamente)$/.test(text)
+  if (confirmsGuide || requestsGuideAgain) return {kind: 'local', answer: productGuide.trim()} as const
+  if (asksToResend) {
+    if (latest?.role === 'assistant' && latest.content.trim() && !clarificationMessages.has(latest.content)) {
+      return {kind: 'local', answer: latest.content} as const
+    }
+    return {kind: 'clarify', answer: resendQuestion} as const
+  }
+
+  if (/^(?:continue|continua|continuar|retome|retoma|retomar|tente de novo|tenta de novo|faca de novo|faz de novo|refaca|refaz|prossiga|siga)(?: (?:isso|isto|de onde parou|aqui|daqui|por favor))?$/.test(text)) {
+    return {kind: 'clarify', answer: continuationQuestion} as const
+  }
+
+  if (/^(?:corrija|corrige|conserte|conserta|ajuste|arrume|altere|mude|fix) (?:isso|isto|esse (?:erro|bug)|that|it)$/.test(text)) {
+    const recent = history.slice(-2).map(turn => turn.content).join(' ')
+    // The project endpoint forwards the recent turns. The standalone engineering endpoint takes only the current request.
+    const namedFile = /\b(?!node\.js\b)[\w.-]+\.(?:[cm]?[jt]sx?|py|java|go|rs|cs|cbl|html|css|json|md)\b/i.test(recent)
+    const diagnostic = /\b(?:TypeError|SyntaxError|ReferenceError|ECONNRESET|ENOENT|ERR_[A-Z_]+)\b/.test(recent)
+    const identifiesError = diagnostic || namedFile && /\b(?:erro|bug|falh\w*|exception|regressao|stack trace)\b/i.test(recent)
+    if (!inProject || !identifiesError || latest?.content === correctionQuestion) return {kind: 'clarify', answer: correctionQuestion} as const
+  }
+  if (/^(?:isso|isto|esse|essa|o mesmo|a mesma coisa|faz isso|faca isso|pode|vai|manda|mande|pode mandar|arruma ai)(?: por favor)?$/.test(text)) {
+    return {kind: 'clarify', answer: scopeQuestion} as const
+  }
+}
+
 const identityAnswers = {
   introduction: 'Sou o Ophiuchus, seu assistente de engenharia de software.',
   capabilities: 'Posso explicar código, propor correções e coordenar uma equipe de agentes para tarefas maiores. Você revisa e aprova as alterações antes que elas sejam aplicadas ao projeto.',
 }
 
 export function routeIntent(prompt: string, history: HistoryTurn[] = [], now = new Date(),
-  binding?: {providerId: string; modelId: string}) {
+  binding?: {providerId: string; modelId: string}, inProject = false) {
   const text = prompt.trim().normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
     .replace(/[?!.]+$/, '').trim().replace(/\s+/g, ' ')
   const question = text.replace(/\b(?:oq|oque)\b/g, 'o que')
     .replace(/\bvc\b/g, 'voce').replace(/\bpra\b/g, 'para')
+
+  const continuation = resolveContinuation(question, history, inProject)
+  if (continuation) return continuation
 
   if (/^(?:quem (?:e voce|voce e)|o que (?:e voce|voce e)|qual (?:e )?(?:o )?seu nome|who are you|what are you)$/.test(question)) {
     return {kind: 'local', answer: identityAnswers.introduction} as const
@@ -75,10 +115,6 @@ export function routeIntent(prompt: string, history: HistoryTurn[] = [], now = n
   const mutation = /\b(?:crie|cria|implemente|implementa|corrija|corrige|conserte|conserta|adicione|adiciona|remova|altere|mude|refatore|gere|escreva|ajuste|fix|implement|build|add|create)\b/
   const asksHow = /^(?:como (?:eu |posso )?|how (?:do i |can i ))/
   if (mutation.test(text) && !asksHow.test(text)) {
-    const refersBack = /^(?:corrija|corrige|conserte|conserta|ajuste|fix) (?:isso|isto|esse (?:erro|bug)|that|it)$/.test(text)
-    if (refersBack && !history.length) {
-      return {kind: 'clarify', answer: 'Qual erro você quer corrigir? Mande a mensagem de erro ou indique o arquivo.'} as const
-    }
     return {kind: 'engineering'} as const
   }
   if (/^(?:o que|por que|porque|qual|quais|quando|onde|quem|quanto|como|que |(?:me )?expli(?:que|ca)|analise|resuma|compare|oi|ola|obrigad[oa]|what|why|how|who|when|where|explain)\b/.test(text) || prompt.trim().endsWith('?')) {

@@ -94,10 +94,11 @@ const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({onExpl
  const task=async(request:string)=>{
   if(!project||taskLock.current||busy)return false;
   const turnId=crypto.randomUUID();
-  const history=messages.filter(m=>!m.error).slice(-6).map(({role,text})=>({role,content:text.slice(0,1800)}));
-  const intent=routeIntent(request,history,new Date(),binding);
+  const recent=messages.filter(m=>!m.error).slice(-6).map(({role,text})=>({role,content:text}));
+  const history=recent.map(turn=>({...turn,content:turn.content.slice(0,1800)}));
+  const intent=routeIntent(request,recent,new Date(),binding,true);
   setMessages(m=>[...m,{id:turnId,role:'user',text:request}]);
-  if(intent.kind==='local'||(mode==='auto'&&intent.kind==='clarify')){
+  if(intent.kind==='local'||intent.kind==='clarify'){
    setMessages(m=>[...m,{id:crypto.randomUUID(),role:'assistant',text:intent.answer}]);
    return true;
   }
