@@ -29,8 +29,27 @@ const resendQuestion = 'O que você quer que eu mande novamente?'
 const continuationQuestion = 'O que você quer continuar? Indique a conversa, a proposta ou o próximo passo.'
 const correctionQuestion = 'Qual erro você quer corrigir? Mande a mensagem de erro ou indique o arquivo.'
 const scopeQuestion = 'O que você quer que eu faça com isso? Posso explicar, analisar ou propor uma alteração.'
+const createQuestion = 'O que você quer criar? Escolha uma opção ou descreva o resultado esperado.'
 const resendChoice = 'Você quer que eu reenvie o guia ou a proposta?'
-const clarificationMessages = new Set([resendChoice,resendQuestion, continuationQuestion, correctionQuestion, scopeQuestion])
+const clarificationMessages = new Set([createQuestion,resendChoice,resendQuestion, continuationQuestion, correctionQuestion, scopeQuestion])
+
+export function clarificationOptions(answer: string) {
+  if (answer === createQuestion) return [
+    {label:'Novo projeto', prompt:'Crie um projeto para '},
+    {label:'Novo arquivo', prompt:'Crie um arquivo chamado '},
+    {label:'Nova funcionalidade', prompt:'Adicione uma funcionalidade para '},
+  ]
+  if (answer === resendChoice) return [
+    {label:'O guia', prompt:'o guia'},
+    {label:'A proposta', prompt:'a proposta'},
+  ]
+  if (answer === scopeQuestion) return [
+    {label:'Explicar', prompt:'Explique '},
+    {label:'Analisar', prompt:'Analise '},
+    {label:'Propor alteração', prompt:'Altere '},
+  ]
+  return []
+}
 
 function resolveContinuation(text: string, history: HistoryTurn[], inProject: boolean) {
   const latest = history.at(-1)
@@ -146,7 +165,15 @@ export function routeIntent(prompt: string, history: HistoryTurn[] = [], now = n
   const instruction = question.replace(/^(?:por favor[ ,]+|preciso que (?:voce )?|quero que (?:voce )?|gostaria que (?:voce )?|(?:voce )?(?:pode|consegue|poderia) (?:me )?)+/, '')
   const change = /^(?:crie|cria|criar|implemente|implementa|implementar|corrija|corrige|corrigir|conserte|conserta|consertar|arrume|adicione|adiciona|adicionar|remova|remover|altere|alterar|mude|refatore|refatorar|gere|escreva|ajuste|simplifique|transforme|melhore|desenvolva|fix|implement|build|add|create)\s+(.+)$/.exec(instruction)
   if (change) {
-    const target = change[1].replace(/(?:,? por favor| para mim| pra mim| ai| aqui)$/, '')
+    const target = change[1].replace(/(?:,? por favor| para mim| pra mim| ai| aqui)$/, '').trim()
+    const identifiers = target.match(/[a-z0-9]+/g) ?? []
+    const filler = /^(?:[oa]s?|uns?|umas?|de|do|da|dos|das|no|na|em|pra|para|com|sem|chamado|chamada|nov[oa]s?|out[rl][oa]s?|mesm[oa]s?|isso|isto|aquilo|algo|algum[ao]?s?|qualquer|coisa|negocio|projeto|app|aplicacao|sistema|arquivo|funcionalidade|componente|pagina|modulo|codigo|trecho|parte|nova|novo|mais|um|uma)$/
+    const noIdentifiedTarget = target === '' || identifiers.every(word=>filler.test(word))
+    const incomplete = /\b(?:para|pra|com|sem|chamad[oa]|de|em|no|na|do|da)$/.test(target)
+    if(noIdentifiedTarget || incomplete){
+      const creating = /^(?:cri[ae]|criar|gere|escreva|desenvolva|build|create)\b/.test(instruction)
+      return {kind:'clarify', answer:creating?createQuestion:scopeQuestion} as const
+    }
     if (/^(?:os? |as? )?(?:algo|alguma coisa|coisa|negocio|codigo|projeto|app|sistema|arquivos?|erros?|bugs?|problemas?|resto|tudo|outro|outra|outros|outras|o mesmo|mesma coisa)$/.test(target) ||
       /^(?:isso|isto|aquilo|ele|ela|esse|essa)(?:$| (?!erro$|bug$))/.test(target) ||
       /^(?:o|a|os|as) que (?:falei|pedi|conversamos|combinamos|falta|ficou faltando)$/.test(target)) {

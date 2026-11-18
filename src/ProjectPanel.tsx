@@ -5,6 +5,7 @@ import type {AgentDefinition} from './domain'
 import {api} from './runtimeClient'
 import {routeIntent} from './intentRouter'
 import ArtifactMarkdown from './ArtifactMarkdown'
+import ClarificationOptions from './ClarificationOptions'
 import './project-panel.css'
 import ProjectFlow from './ProjectFlow'
 import WorkspaceArea from './WorkspaceArea'
@@ -27,8 +28,8 @@ function FileTree({files,selected,onSelect,onOpen,prefix='',depth=0}:{files:File
 }
 export type ProjectHandle={submit:(goal:string)=>Promise<boolean>;openFolder:()=>Promise<boolean>;openChat:(saved:ArchivedChat|null)=>Promise<void>}
 export type ProjectStatus={active:boolean;name:string;busy:boolean;canSend:boolean}
-type Props={onExplorer:()=>void;onArchive?: (snapshot:ChatSnapshot)=>void;agents:AgentDefinition[];onSettings:()=>void;sidebarTarget:HTMLElement|null;workTarget:HTMLElement|null;onStatus:(status:ProjectStatus)=>void;onNewChat:()=>void;engineering:boolean;inspectorTarget:HTMLElement|null;onInspect:()=>void;onCloseInspector:()=>void;disabled?:boolean}
-const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({onExplorer,onArchive,agents,onSettings,sidebarTarget,workTarget,onStatus,onNewChat,engineering,inspectorTarget,onInspect,onCloseInspector,disabled=false},ref){
+type Props={onClarification:(prompt:string)=>void;onExplorer:()=>void;onArchive?: (snapshot:ChatSnapshot)=>void;agents:AgentDefinition[];onSettings:()=>void;sidebarTarget:HTMLElement|null;workTarget:HTMLElement|null;onStatus:(status:ProjectStatus)=>void;onNewChat:()=>void;engineering:boolean;inspectorTarget:HTMLElement|null;onInspect:()=>void;onCloseInspector:()=>void;disabled?:boolean}
+const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({onClarification,onExplorer,onArchive,agents,onSettings,sidebarTarget,workTarget,onStatus,onNewChat,engineering,inspectorTarget,onInspect,onCloseInspector,disabled=false},ref){
  const [workspaceView,setWorkspaceView]=useState<WorkspaceView>('files')
  const [path,setPath]=useState(''),[readAllowed,setReadAllowed]=useState(false),[project,setProject]=useState<Project|null>(null)
  const [selected,setSelected]=useState<string[]>([]),[preview,setPreview]=useState<{path:string;content:string}|null>(null)
@@ -208,6 +209,7 @@ const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({onExpl
    <div className={'v5-chat-avatar '+message.role}>{message.role==='user'?<UserRound size={22}/>:<Sparkles size={22}/>}</div>
    <div className={'project-message '+(message.error?'project-message-error':'')}><span className="v5-chat-by">{message.role==='user'?'Você':'Ophiuchus'}</span>
     <ArtifactMarkdown text={message.text}/>
+    {message.role==='assistant'&&messages.at(-1)?.id===message.id&&<ClarificationOptions answer={message.text} onChoose={onClarification}/>}
     {project&&message.draftId&&(!savedDraft||project.drafts?.some(item=>item.id===message.draftId)||Object.values(flows).some(item=>item.draftId===message.draftId&&item.projectId===project.id))&&<button disabled={Boolean(busy)} onClick={()=>showDraft(message.draftId!)}><GitCompareArrows size={14}/> Revisar proposta</button>}
    </div>
   </div>

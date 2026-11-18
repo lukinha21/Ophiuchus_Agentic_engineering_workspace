@@ -72,3 +72,17 @@ test('follow-up intent uses meaning and context without starting an ambiguous en
  assert.equal(ask('corrige isso',[{role:'assistant',content:'Há um erro em sum.mjs.'}],true).kind,'engineering');
  assert.equal(ask('O que acontece quando alguém escreve crie um app?').kind,'direct');
 });
+
+test('creation without a named target asks before dispatch and offers safe completion options',async()=>{
+ const result=await build({entryPoints:['src/intentRouter.ts'],bundle:true,platform:'node',format:'esm',write:false,loader:{'.md':'text'}});
+ const {routeIntent,clarificationOptions}=await import('data:text/javascript;base64,'+Buffer.from(result.outputFiles[0].text).toString('base64'));
+ for(const prompt of ['crie um novo','crie uma nova','poderia criar outro?','crie uma nova funcionalidade','crie um arquivo chamado','crie um projeto para']){
+  const route=routeIntent(prompt);
+  assert.equal(route.kind,'clarify',prompt);
+  const options=clarificationOptions(route.answer);
+  assert.deepEqual(options.map(option=>option.label),['Novo projeto','Novo arquivo','Nova funcionalidade']);
+  for(const option of options)assert.notEqual(routeIntent(option.prompt).kind,'engineering');
+ }
+ assert.equal(routeIntent('Crie um novo arquivo sum.mjs').kind,'engineering');
+ assert.equal(routeIntent('Crie um novo projeto para calcular despesas').kind,'engineering');
+});
