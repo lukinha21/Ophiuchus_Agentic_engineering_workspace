@@ -1,4 +1,5 @@
 .chat-image{margin:10px 0;max-width:540px}.chat-image img{display:block;max-width:100%;max-height:430px;border-radius:8px;margin-bottom:8px}.chat-attachment{display:flex;align-items:center;gap:8px;padding:6px 10px;color:var(--studio-muted);font-size:12px}.chat-attachment span{overflow-wrap:anywhere}
+.chat-image-refinement{display:flex;align-items:center;gap:7px;padding:6px 10px;font-size:12px;color:var(--studio-ink)}.chat-image-refinement small{color:var(--studio-muted);margin-left:3px}
 .image-model-settings{display:grid;gap:12px}.image-model-settings label{display:grid;gap:6px}.image-model-settings :is(input,select){width:100%;padding:8px 10px;border:1px solid var(--studio-rule);border-radius:8px;background:var(--studio-paper);color:inherit;font:inherit}.image-model-actions{display:flex;flex-wrap:wrap;gap:8px}
 .image-studio{width:min(900px,100%);margin:0 auto;padding:28px clamp(15px,4vw,34px);color:var(--studio-ink)}
 .image-studio-head{display:flex;gap:13px;align-items:center;margin-bottom:18px}.image-studio-head h1,.image-comparison h2{margin:0}.image-studio-head p{margin:4px 0;color:var(--studio-muted);font-size:13px}
