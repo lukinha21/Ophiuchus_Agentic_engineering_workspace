@@ -67,7 +67,7 @@ O status **Pronto para sua revisão** indica que a revisão estática foi conclu
 - Abra **Agentes e modelos**, escolha o papel e associe um provedor e um modelo.
 - Use **Dashboard** na barra superior ou o ícone de gráfico da lateral para consultar execuções, uso registrado de modelos e resultados de testes. As métricas aparecem quando o runtime tem esses dados.
 
-Em **Provedores → Modelos de imagem**, configure o gerador padrão do chat. O modelo de geração pode ser diferente dos modelos de análise visual e de engenharia.
+Em **Provedores → Agentes e modelos → Gerador de imagens**, escolha Google Gemini, OpenAI ou OpenRouter e configure o gerador padrão do chat. A análise visual e o refinamento opcional do prompt usam Gemini. O modelo de geração pode ser diferente dos modelos de análise visual e de engenharia.
 
 Uma etapa pode usar um modelo diferente das demais. Conectar um provedor e associar um modelo ao agente são configurações distintas. O acesso também depende da disponibilidade e da cota do provedor.
 

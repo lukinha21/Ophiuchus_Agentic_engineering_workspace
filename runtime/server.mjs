@@ -12,7 +12,7 @@ import {resolve,dirname} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {createRun,startRun,completeStage,approve,reportFailure,cancel} from './orchestrator.mjs';
 import {capabilities} from './model-capabilities.mjs';
-import {generateGeminiMedia,generateText,listProviders,listModels,maxImageInputBytes} from './providers.mjs';
+import {generateGeminiMedia,generateProviderImage,generateText,listProviders,listModels,listImageModels,maxImageInputBytes,validImageModel} from './providers.mjs';
 import {vaultStatus,unlockVault,lockVault,saveCredential,removeCredential,saveCustomEndpoint} from './vault.mjs';
 import {executeStage} from './executor.mjs';
 import {extractProposals,listWorkspace,readWorkspaceFile,applyProposals} from './workspace.mjs';
@@ -107,13 +107,15 @@ export const server=http.createServer(async(req,res)=>{
   }
   if(req.method==='POST'&&url.pathname==='/chat/images'){
    const input=await readBody(req,Math.ceil(maxImageInputBytes/3)*4+40000);
-   if(input?.confirmSend!==true)throw Error('Autorize o envio ao Google Gemini.');
+   if(input?.confirmSend!==true)throw Error('Autorize o envio da solicitação ao provedor de imagem.');
    const {mode,refinerModel,image}=input;
-   const model=mode!=='analyse'&&input.useConfiguredModel===true?(bindings['image-generator']?.modelId??input.model):input.model;
+   const configured=mode!=='analyse'&&input.useConfiguredModel===true?bindings['image-generator']:null;
+   const providerId=mode==='analyse'?'google':configured?.providerId??input.providerId??'google';
+   const model=configured?.modelId??input.model;
    if(!['analyse','direct','assisted'].includes(mode))throw Error('Selecione uma operação de imagem.');
    if(typeof input.prompt!=='string'||!input.prompt.trim()||input.prompt.length>4000)throw Error('Informe um pedido de até 4.000 caracteres.');
    if(mode==='analyse'?!image:image!==undefined)throw Error(mode==='analyse'?'Anexe uma imagem para analisar.':'Use a descrição para gerar uma imagem.');
-   if(typeof model!=='string'||!/^[a-zA-Z0-9._-]{1,128}$/.test(model))throw Error('Informe um modelo Gemini válido.');
+   if(!validImageModel(providerId,model))throw Error('Informe um modelo válido para o provedor selecionado.');
    if(mode==='assisted'&&(typeof refinerModel!=='string'||!/^[a-zA-Z0-9._-]{1,128}$/.test(refinerModel)))throw Error('Informe um modelo Gemini de texto para refinar a descrição.');
    const controller=new AbortController();
    res.once('close',()=>controller.abort());
@@ -128,8 +130,8 @@ export const server=http.createServer(async(req,res)=>{
     usedPrompt=result.text.trim();
    }
    const signal=AbortSignal.any([controller.signal,AbortSignal.timeout(120000)]);
-   const media=await generateGeminiMedia({model,prompt:usedPrompt,image},{signal});
-   return json(res,200,{...media,mode,model,originalPrompt,usedPrompt,elapsedMs:Date.now()-started,calls:mode==='assisted'?2:1});
+   const media=mode==='analyse'?await generateGeminiMedia({model,prompt:usedPrompt,image},{signal}):await generateProviderImage({providerId,model,prompt:usedPrompt},{signal});
+   return json(res,200,{...media,mode,model,providerId,originalPrompt,usedPrompt,elapsedMs:Date.now()-started,calls:mode==='assisted'?2:1});
   }
   if(req.method==='POST'&&url.pathname==='/chat/direct'){
    const body=await readBody(req);
@@ -181,14 +183,18 @@ export const server=http.createServer(async(req,res)=>{
   }
   if(req.method==='GET'&&url.pathname==='/execution-options')return json(res,200,executionOptions);
   if(req.method==='PUT'&&url.pathname==='/execution-options'){executionOptions=normalizeOptions(await readBody(req));await saveOptions();return json(res,200,executionOptions);}
-  if(req.method==='GET'&&url.pathname==='/image-settings')return json(res,200,{modelId:bindings['image-generator']?.modelId??null});
+  const imageCatalog=url.pathname.match(/^\/providers\/(google|openai|openrouter)\/image-models$/);
+  if(req.method==='GET'&&imageCatalog)return json(res,200,await listImageModels(imageCatalog[1],{signal:AbortSignal.timeout(15000)}));
+  if(req.method==='GET'&&url.pathname==='/image-settings')return json(res,200,bindings['image-generator']??{providerId:'google',modelId:null});
   if(req.method==='PUT'&&url.pathname==='/image-settings'){
    const body=await readBody(req);
    const modelId=typeof body?.modelId==='string'?body.modelId.trim():'';
-   if(!/^[a-zA-Z0-9._-]{1,128}$/.test(modelId))throw Error('Informe um identificador de modelo Gemini válido.');
-   bindings={...bindings,'image-generator':{providerId:'google',modelId}};
+   const providerId=body?.providerId??'google';
+   if(!validImageModel(providerId,modelId))throw Error('Informe um identificador de modelo válido para o provedor.');
+   const settings={providerId,modelId};
+   bindings={...bindings,'image-generator':settings};
    await saveBindings();
-   return json(res,200,{modelId});
+   return json(res,200,settings);
   }
   if(req.method==='GET'&&url.pathname==='/bindings')return json(res,200,bindings);
   if(req.method==='PUT'&&url.pathname==='/bindings'){const body=await readBody(req);if(!body||typeof body!=='object'||Array.isArray(body))throw Error('Bindings inválidos');const next={};for(const [agentId,binding] of Object.entries(body)){if(agentId==='image-generator')continue;if(!/^[a-z0-9_-]{1,64}$/i.test(agentId)||!binding||typeof binding!=='object'||typeof binding.providerId!=='string'||typeof binding.modelId!=='string'||binding.modelId.length>180||!binding.modelId.trim())throw Error('Binding inválido');if(!listProviders().some(p=>p.id===binding.providerId))throw Error('Provedor não suportado');next[agentId]={providerId:binding.providerId,modelId:binding.modelId};}if(bindings['image-generator'])next['image-generator']=bindings['image-generator'];bindings=next;await saveBindings();return json(res,200,bindings);}

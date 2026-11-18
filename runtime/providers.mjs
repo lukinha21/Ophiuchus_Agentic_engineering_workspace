@@ -76,6 +76,47 @@ export async function generateGeminiMedia({model,prompt,image},{env=process.env,
  return {image:validatedImage(generated.inlineData,maxImageOutputBytes)};
 }
 
+export const imageGenerationProviders=new Set(['google','openai','openrouter']);
+export function validImageModel(providerId,model){
+ return imageGenerationProviders.has(providerId)&&typeof model==='string'&&model.length<=128&&
+  (providerId==='openrouter'?/^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._:-]+$/:/^[a-zA-Z0-9._-]+$/).test(model);
+}
+
+export async function listImageModels(providerId,options={}){
+ if(!imageGenerationProviders.has(providerId))throw Error('Provedor sem integração de geração de imagens.');
+ if(providerId!=='openrouter'){
+  const models=await listModels(providerId,options);
+  return models.filter(model=>providerId==='google'?/image|nano-banana/i.test(model.id):/^gpt-image(?:-|$)/i.test(model.id));
+ }
+ const {env=process.env,fetchImpl=fetch,signal}=options;
+ const provider=resolveProvider(providerId,env);
+ if(!provider.configured)throw Error('Configure o OpenRouter em Provedores.');
+ const response=await fetchImpl(provider.baseUrl+'/images/models',{headers:headers(provider),signal});
+ await checkResponse(response,provider.name);
+ const payload=await response.json();
+ if(!Array.isArray(payload.data))throw Error('Catálogo de imagens inválido.');
+ return payload.data.filter(model=>validImageModel(providerId,model.id)).map(model=>({id:model.id,providerId,label:model.name||model.id}));
+}
+
+export async function generateProviderImage({providerId,model,prompt},options={}){
+ if(!validImageModel(providerId,model))throw Error('Informe um modelo de imagem válido para o provedor selecionado.');
+ if(providerId==='google')return generateGeminiMedia({model,prompt},options);
+ const {env=process.env,fetchImpl=fetch,signal}=options;
+ const provider=resolveProvider(providerId,env);
+ if(!provider.configured)throw Error('Configure '+provider.name+' em Provedores e desbloqueie o cofre.');
+ if(providerId==='openai'&&!/^gpt-image(?:-|$)/i.test(model))throw Error('Selecione um modelo GPT Image no catálogo da OpenAI.');
+ const response=await fetchImpl(provider.baseUrl+(providerId==='openai'?'/images/generations':'/images'),{
+  method:'POST',headers:{...headers(provider),'Content-Type':'application/json'},
+  body:JSON.stringify({model,prompt,...(providerId==='openai'?{output_format:'png',n:1}:{})}),signal,
+ });
+ await checkResponse(response,provider.name);
+ const output=(await response.json()).data?.[0];
+ const data=output?.b64_json;
+ if(typeof data!=='string'||!data)throw Error('O provedor não retornou os bytes de uma imagem.');
+ const mimeType=output.media_type||(data.startsWith('/9j/')?'image/jpeg':data.startsWith('UklG')?'image/webp':'image/png');
+ return {image:validatedImage({data,mimeType},maxImageOutputBytes)};
+}
+
 function normalizeMessages(messages){return messages.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:String(m.content)}]}));}
 export async function generateText({providerId,model,messages,maxOutputTokens=600,allowEmptyTruncated=false,responseContract,policy={}},{env=process.env,fetchImpl=fetch,signal}={}){
  const p=resolveProvider(providerId,env);if(!p.configured)throw Error('Provedor não configurado no servidor');

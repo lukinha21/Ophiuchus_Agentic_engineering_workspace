@@ -3,18 +3,18 @@ import type {ClipboardEvent} from 'react'
 import {Download,Image as ImageIcon,Paperclip,Search,Sparkles,X} from 'lucide-react'
 import ArtifactMarkdown from './ArtifactMarkdown'
 import {api} from './runtimeClient'
-import {defaultVisionModel,encodeImage,imageDataUrl,isSupportedImage} from './chatMedia'
-import type {MediaResult} from './chatMedia'
+import {defaultVisionModel,encodeImage,imageDataUrl,imageProviders,isSupportedImage} from './chatMedia'
+import type {ImageBinding,ImageProviderId,MediaResult} from './chatMedia'
 import './image-studio.css'
 
 type Mode = 'analyse' | 'direct' | 'assisted'
 type Entry = {id: string; result: MediaResult}
 const modeLabel = {analyse:'Análise',direct:'Direta',assisted:'Com agente'}
-export default function ImageStudio({configuredImageModel}:{configuredImageModel:string}){
+export default function ImageStudio({configuredGenerator}:{configuredGenerator:ImageBinding}){
  const [mode,setMode]=useState<'analyse'|'generate'>('analyse')
  const [textModel,setTextModel]=useState(defaultVisionModel)
- const [imageModel,setImageModel]=useState(configuredImageModel)
- useEffect(()=>setImageModel(configuredImageModel),[configuredImageModel])
+ const [generator,setGenerator]=useState(configuredGenerator)
+ useEffect(()=>setGenerator(configuredGenerator),[configuredGenerator])
  const [prompt,setPrompt]=useState('')
  const [file,setFile]=useState<File|null>(null)
  const [busy,setBusy]=useState<Mode|null>(null)
@@ -42,7 +42,7 @@ export default function ImageStudio({configuredImageModel}:{configuredImageModel
   operation.current=controller;setBusy(next);setError('')
   try{
    const result=await api<MediaResult>('/chat/images',{
-    mode:next,prompt,model:next==='analyse'?textModel.trim():imageModel.trim(),
+    mode:next,prompt,model:next==='analyse'?textModel.trim():generator.modelId.trim(),providerId:next==='analyse'?'google':generator.providerId,
     ...(next==='analyse'&&file?{image:await encodeImage(file)}:{}),
     ...(next==='assisted'?{refinerModel:textModel.trim()}:{}),confirmSend:true,
    },undefined,AbortSignal.any([controller.signal,AbortSignal.timeout(160000)]))
@@ -53,8 +53,8 @@ export default function ImageStudio({configuredImageModel}:{configuredImageModel
    operation.current=null;setBusy(null)
   }
  }
- const enabled=Boolean(!busy&&prompt.trim()&&consent&&(mode==='analyse'?file&&textModel.trim():imageModel.trim()))
- const comparable=entries.filter(({result})=>result.image&&result.originalPrompt===prompt.trim()&&result.model===imageModel.trim())
+ const enabled=Boolean(!busy&&prompt.trim()&&consent&&(mode==='analyse'?file&&textModel.trim():generator.modelId.trim()))
+ const comparable=entries.filter(({result})=>result.image&&result.originalPrompt===prompt.trim()&&result.model===generator.modelId.trim()&&result.providerId===generator.providerId)
  const pair=[comparable.find(entry=>entry.result.mode==='direct'),comparable.find(entry=>entry.result.mode==='assisted')]
  const paired=pair[0]&&pair[1]?pair as [Entry,Entry]:null
  const shown=paired?entries.filter(entry=>!paired.includes(entry)):entries
@@ -72,14 +72,14 @@ export default function ImageStudio({configuredImageModel}:{configuredImageModel
  }
 
  return <main className="image-studio" aria-label="Chat de imagens">
-  <header className="image-studio-head"><ImageIcon size={24}/><div><h1>Chat de imagens</h1><p>Analise um print ou gere imagens com o Google Gemini.</p></div></header>
+  <header className="image-studio-head"><ImageIcon size={24}/><div><h1>Chat de imagens</h1><p>Analise um print com o Gemini ou escolha um provedor para gerar imagens.</p></div></header>
   <div className="image-modes" aria-label="Tipo de operação">
    <button type="button" disabled={Boolean(busy)} aria-pressed={mode==='analyse'} onClick={()=>{setMode('analyse');setConsent(false);setError('')}}><Search size={16}/> Analisar imagem</button>
    <button type="button" disabled={Boolean(busy)} aria-pressed={mode==='generate'} onClick={()=>{setMode('generate');setConsent(false);setError('')}}><Sparkles size={16}/> Gerar imagem</button>
   </div>
   <section className="image-composer" aria-label="Pedido de imagem">
    <div className="image-fields">
-    {mode==='generate'&&<label>Modelo de imagem<input disabled={Boolean(busy)} value={imageModel} maxLength={128} onChange={event=>setImageModel(event.target.value)}/></label>}
+    {mode==='generate'&&<><label>Provedor de imagem<select disabled={Boolean(busy)} value={generator.providerId} onChange={event=>{const providerId=event.target.value as ImageProviderId;setGenerator({providerId,modelId:providerId===configuredGenerator.providerId?configuredGenerator.modelId:''});setConsent(false)}}>{Object.entries(imageProviders).map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label><label>Modelo de imagem<input disabled={Boolean(busy)} value={generator.modelId} maxLength={128} onChange={event=>setGenerator(current=>({...current,modelId:event.target.value}))}/></label></>}
     <label>{mode==='analyse'?'Modelo de análise':'Modelo do agente de prompt'}<input disabled={Boolean(busy)} value={textModel} maxLength={128} onChange={event=>setTextModel(event.target.value)}/></label>
    </div>
    {mode==='analyse'&&<div className="image-attachment">
@@ -91,7 +91,7 @@ export default function ImageStudio({configuredImageModel}:{configuredImageModel
     <textarea value={prompt} disabled={Boolean(busy)} maxLength={4000} onPaste={paste} onChange={event=>setPrompt(event.target.value)} placeholder={mode==='analyse'?'O que este print mostra?':'Descreva a cena, o estilo e os detalhes que quer preservar.'}/>
    </label>
    <label className="image-consent"><input type="checkbox" disabled={Boolean(busy)} checked={consent} onChange={event=>setConsent(event.target.checked)}/>
-    {mode==='analyse'?'Autorizo o envio da imagem e da pergunta ao Google Gemini.':'Autorizo o envio da descrição ao Google Gemini. A geração pode gerar custos.'}
+    {mode==='analyse'?'Autorizo o envio da imagem e da pergunta ao Google Gemini.':'Autorizo o envio da descrição a '+imageProviders[generator.providerId]+'. Com agente, o refinamento usa o Gemini. As chamadas podem gerar custos.'}
    </label>
    <div className="image-actions">
     {mode==='analyse'?<button type="button" disabled={!enabled} onClick={()=>void submit('analyse')}>Analisar</button>:<>

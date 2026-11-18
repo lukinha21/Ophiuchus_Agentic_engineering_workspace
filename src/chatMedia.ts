@@ -2,12 +2,15 @@ import {api} from './runtimeClient'
 
 export type MediaImage = {mimeType:'image/png'|'image/jpeg'|'image/webp';data:string}
 export type MediaResult = {
- mode:'analyse'|'direct'|'assisted';model:string;originalPrompt:string;usedPrompt:string
+ mode:'analyse'|'direct'|'assisted';model:string;providerId?:ImageProviderId;originalPrompt:string;usedPrompt:string
  elapsedMs:number;calls:number;text?:string;image?:MediaImage
 }
 export type MediaTurn = {text:string;mediaId?:string}
 export const defaultVisionModel='gemini-3.1-flash-lite'
-export const defaultImageModel='gemini-3.1-flash-lite-image'
+export const imageProviders={google:'Google Gemini',openai:'OpenAI',openrouter:'OpenRouter'} as const
+export type ImageProviderId=keyof typeof imageProviders
+export type ImageBinding={providerId:ImageProviderId;modelId:string}
+export const defaultImageBinding:ImageBinding={providerId:'google',modelId:'gemini-3.1-flash-lite-image'}
 export const imageFormats=['image/png','image/jpeg','image/webp']
 export const maxAttachmentSize=4*1024*1024
 
@@ -86,9 +89,9 @@ async function storeChatImage(image:MediaImage){
  return id
 }
 
-export async function sendChatImage(prompt:string,file:File|null,mode:'analyse'|'direct'|'assisted',imageModel=defaultImageModel):Promise<MediaTurn>{
+export async function sendChatImage(prompt:string,file:File|null,mode:'analyse'|'direct'|'assisted',generator=defaultImageBinding):Promise<MediaTurn>{
  const result=await api<MediaResult>('/chat/images',{
-  mode,prompt,model:mode==='analyse'?defaultVisionModel:imageModel,useConfiguredModel:mode!=='analyse',
+  mode,prompt,model:mode==='analyse'?defaultVisionModel:generator.modelId,providerId:mode==='analyse'?'google':generator.providerId,useConfiguredModel:mode!=='analyse',
   ...(file?{image:await encodeImage(file)}:{}),
   ...(mode==='assisted'?{refinerModel:defaultVisionModel}:{}),
   confirmSend:true,
