@@ -113,11 +113,18 @@ export const server=http.createServer(async(req,res)=>{
    if(typeof binding?.providerId!=='string'||typeof binding.modelId!=='string'||!binding.modelId.trim())throw Error('Configure um modelo para o chat');
    const history=Array.isArray(body.history)?body.history.slice(-6).filter(turn=>turn&&['user','assistant'].includes(turn.role)&&typeof turn.content==='string').map(({role,content})=>({role,content:content.slice(0,1800)})):[];
    if(binding.providerId==='mock')throw Error('Configure um provedor real para respostas de IA');
-   const result=await generateText({providerId:binding.providerId,model:binding.modelId,maxOutputTokens:2048,messages:[
-    {role:'system',content:'Você responde como Ophiuchus, o assistente de engenharia de software deste aplicativo. Ophiuchus coordena agentes e seu modelo nesta chamada é '+binding.modelId+' ('+binding.providerId+'). Se perguntarem sua identidade, apresente-se como Ophiuchus e identifique o modelo quando solicitado. Responda diretamente à pergunta do usuário em linguagem natural. Você não pode acessar, alterar ou testar arquivos do usuário. Para perguntas sobre o Ophiuchus, use a referência do produto. Se a referência não cobrir um detalhe, diga que não consegue confirmá-lo. Referência: '+Object.values(productHelp).join('\n\n')},
+   const resolveIntent=body.resolveIntent===true;
+   const result=await generateText({providerId:binding.providerId,model:binding.modelId,maxOutputTokens:resolveIntent?512:2048,messages:[
+    {role:'system',content:resolveIntent?'Classifique a intenção da última mensagem usando apenas a conversa fornecida. Se for uma pergunta clara que pode ser respondida no chat, use kind answer e responda brevemente. Se o objetivo, a referência, o alvo ou a autorização de uma mudança forem ambíguos, use kind clarify e faça uma pergunta específica. Se o pedido exigir alteração ou execução, use kind clarify para confirmar o escopo. Nunca alegue ter iniciado execuções, enviado artefatos ou lido arquivos. Retorne somente JSON {"kind":"answer" ou "clarify","text":"resposta ou pergunta"}. Referência do produto: '+Object.values(productHelp).join('\n\n'):'Você responde como Ophiuchus, o assistente de engenharia de software deste aplicativo. Ophiuchus coordena agentes e seu modelo nesta chamada é '+binding.modelId+' ('+binding.providerId+'). Se perguntarem sua identidade, apresente-se como Ophiuchus e identifique o modelo quando solicitado. Responda diretamente à pergunta do usuário em linguagem natural. Você não pode acessar, alterar ou testar arquivos do usuário. Para perguntas sobre o Ophiuchus, use a referência do produto. Se a referência não cobrir um detalhe, diga que não consegue confirmá-lo. Referência: '+Object.values(productHelp).join('\n\n')},
     ...history,{role:'user',content:body.prompt}
    ]},{signal:AbortSignal.timeout(90000)});
    if(result.finishReason==='length'||!result.text?.trim())throw Error('O modelo não retornou uma resposta completa');
+   if(resolveIntent){
+    let resolution;
+    try{resolution=JSON.parse(result.text)}catch{throw Error('Não foi possível interpretar o pedido')}
+    if(!['answer','clarify'].includes(resolution?.kind)||typeof resolution.text!=='string'||!resolution.text.trim()||resolution.text.length>2000)throw Error('Não foi possível interpretar o pedido');
+    return json(res,200,{answer:resolution.text.trim()});
+   }
    return json(res,200,{answer:result.text});
   }
   if(req.method==='GET'&&url.pathname==='/health')return json(res,200,{ok:true,service:'ophiuchus-control-plane',providerExecution:true});

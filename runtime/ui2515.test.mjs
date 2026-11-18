@@ -48,3 +48,27 @@ test('guide requests resolve locally even if the resend modifier precedes the ob
  assert.equal(routeIntent('mande novamente').kind,'clarify');
  assert.notEqual(routeIntent('mande novamente o guia do meu projeto').kind,'local');
 });
+
+test('follow-up intent uses meaning and context without starting an ambiguous engineering run',async()=>{
+ const result=await build({entryPoints:['src/intentRouter.ts'],bundle:true,platform:'node',format:'esm',write:false,loader:{'.md':'text'}});
+ const {routeIntent}=await import('data:text/javascript;base64,'+Buffer.from(result.outputFiles[0].text).toString('base64'));
+ const ask=(prompt,turns=[],inProject=false)=>routeIntent(prompt,turns,new Date(),undefined,inProject);
+ const response={role:'assistant',content:'Um parágrafo recente.'};
+ for(const phrase of ['consegue mandar aquilo outra vez?','poderia me enviar novamente?','manda mais uma vez, por favor','reenvie a última resposta']){
+  assert.equal(ask(phrase,[response]).answer,response.content,phrase);
+  assert.equal(ask(phrase).kind,'clarify',phrase);
+ }
+ const guide={role:'assistant',content:'# Guia do Ophiuchus'};
+ const proposal={role:'assistant',content:'Proposta de correção',draftId:'draft'};
+ const ambiguity=ask('consegue mandar aquilo outra vez?',[guide,proposal]);
+ assert.equal(ambiguity.kind,'clarify');
+ assert.match(ambiguity.answer,/guia ou a proposta/);
+ assert.deepEqual(ask('a proposta',[guide,proposal,{role:'assistant',content:ambiguity.answer}]),{kind:'local',answer:proposal.content,draftId:'draft'});
+ assert.equal(ask('consegue mandar aquilo outra vez?',[{role:'user',content:'Uma pergunta'}]).kind,'clarify');
+ for(const phrase of ['corrija o que pedi','implemente aquilo','arruma o código','uma ideia pra depois','consegue seguir por aí?']){
+  assert.notEqual(ask(phrase).kind,'engineering',phrase);
+ }
+ assert.equal(ask('pode corrigir o cálculo em sum.mjs?').kind,'engineering');
+ assert.equal(ask('corrige isso',[{role:'assistant',content:'Há um erro em sum.mjs.'}],true).kind,'engineering');
+ assert.equal(ask('O que acontece quando alguém escreve crie um app?').kind,'direct');
+});

@@ -94,13 +94,24 @@ const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({onExpl
  const task=async(request:string)=>{
   if(!project||taskLock.current||busy)return false;
   const turnId=crypto.randomUUID();
-  const recent=messages.filter(m=>!m.error).slice(-6).map(({role,text})=>({role,content:text}));
-  const history=recent.map(turn=>({...turn,content:turn.content.slice(0,1800)}));
+  const recent=messages.filter(m=>!m.error).slice(-6).map(({role,text,draftId})=>({role,content:text,draftId}));
+  const history=recent.map(({role,content})=>({role,content:content.slice(0,1800)}));
   const intent=routeIntent(request,recent,new Date(),binding,true);
   setMessages(m=>[...m,{id:turnId,role:'user',text:request}]);
   if(intent.kind==='local'||intent.kind==='clarify'){
-   setMessages(m=>[...m,{id:crypto.randomUUID(),role:'assistant',text:intent.answer}]);
+   setMessages(m=>[...m,{id:crypto.randomUUID(),role:'assistant',text:intent.answer,draftId:'draftId' in intent?intent.draftId:undefined}]);
    return true;
+  }
+  if(intent.kind==='uncertain'){
+   const canResolve=sendAllowed&&binding?.providerId&&binding.providerId!=='mock'&&binding.modelId
+   if(!canResolve){setMessages(m=>[...m,{id:crypto.randomUUID(),role:'assistant',text:intent.answer}]);return true}
+   taskLock.current=true
+   try{
+    return await action('Esclarecendo o pedido',async()=>{
+     const result=await api<{answer:string}>('/chat/direct',{prompt:request,history,binding,confirmSend:true,resolveIntent:true}).catch(()=>null)
+     setMessages(m=>[...m,{id:crypto.randomUUID(),role:'assistant',text:result?.answer||intent.answer}])
+    })
+   }finally{taskLock.current=false}
   }
   if(!sendAllowed){
    setMessages(m=>[...m,{id:crypto.randomUUID(),role:'assistant',text:'Para este pedido, autorize o envio aos modelos em Contexto e permissões e envie novamente.',error:true}]);

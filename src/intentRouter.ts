@@ -23,24 +23,49 @@ function answerProductQuestion(question: string) {
   if (aboutOphiuchus.test(question) && /\b(?:agentes?|fluxos?|equipe|funciona)\b/.test(question)) return productHelp.workflow
 }
 
-type HistoryTurn = {role: 'user' | 'assistant'; content: string}
+type HistoryTurn = {role: 'user' | 'assistant'; content: string; draftId?: string}
 
 const resendQuestion = 'O que você quer que eu mande novamente?'
 const continuationQuestion = 'O que você quer continuar? Indique a conversa, a proposta ou o próximo passo.'
 const correctionQuestion = 'Qual erro você quer corrigir? Mande a mensagem de erro ou indique o arquivo.'
 const scopeQuestion = 'O que você quer que eu faça com isso? Posso explicar, analisar ou propor uma alteração.'
-const clarificationMessages = new Set([resendQuestion, continuationQuestion, correctionQuestion, scopeQuestion])
+const resendChoice = 'Você quer que eu reenvie o guia ou a proposta?'
+const clarificationMessages = new Set([resendChoice,resendQuestion, continuationQuestion, correctionQuestion, scopeQuestion])
 
 function resolveContinuation(text: string, history: HistoryTurn[], inProject: boolean) {
   const latest = history.at(-1)
-  const asksToResend = /^(?:pode |voce pode )?(?:(?:me )?(?:manda|mande|mandar|envie|envia|enviar|reenvie|reenvia|reenviar|repita|repete|repetir|mostre|mostra|mostrar)(?:\s+(?:isso|isto|ele|ela|a (?:ultima )?resposta))?\s+(?:novamente|de novo|outra vez)|(?:me )?(?:reenvie|reenvia|repita|repete)(?:\s+(?:isso|a (?:ultima )?resposta))?|de novo|novamente)(?: por favor)?$/.test(text)
+  const request = text.replace(/[,:]/g, ' ').replace(/\s+/g, ' ').replace(/^(?:por favor |entao )+/, '')
+  const resendVerb = /\b(?:mand[ae]|mandar|envi[ae]|enviar|reenvi[ae]|reenviar|repit[ae]|repet[ei]|repetir|mostr[ae]|mostrar|receber)\b/
+  const repeat = /\b(?:novamente|de novo|outra vez|mais uma vez)\b/
+  const asksToResend = (/^(?:de novo|novamente)$/.test(request) || resendVerb.test(request) && repeat.test(request) ||
+    /^(?:(?:voce )?(?:pode|consegue|poderia) )?(?:me )?(?:reenvie|reenvia|reenviar|repita|repete|repetir)\b/.test(request))
+  const target = request
+    .replace(/\b(?:por favor|de novo|outra vez|mais uma vez|do ophiuchus)\b/g, ' ')
+    .replace(new RegExp(resendVerb.source, 'g'), ' ')
+    .replace(/\b(?:me|voce|pode|pod[ei]ria|consegue|conseguiria|tem|como|quero|gostaria|de|o|a|um|uma|novamente|complet[ao])\b/g, ' ')
+    .trim().replace(/\s+/g, ' ')
   const confirmsGuide = latest?.role === 'assistant' && latest.content === resendQuestion &&
     /^(?:o guia|o manual|a documentacao)(?: (?:complet[ao]|do ophiuchus))?$/.test(text)
-  const requestsGuideAgain = /^(?:(?:voce )?pode )?(?:me )?(?:manda|mande|mandar|envie|envia|enviar|reenvie|reenvia|reenviar|repita|repete|repetir) (?:de novo |novamente )?(?:o guia|o manual|a documentacao)(?: complet[ao])?(?: do ophiuchus)?(?: de novo| novamente)?(?: por favor)?$/.test(text)
+  const requestsGuideAgain = resendVerb.test(request) && /^(?:guia|manual|documentacao)$/.test(target)
+  const choosingProposal = latest?.role === 'assistant' && latest.content === resendChoice &&
+    /^(?:a )?proposta$/.test(text)
+  const choosingGuide = latest?.role === 'assistant' && latest.content === resendChoice &&
+    /^(?:o )?(?:guia|manual)$/.test(text)
+  if (choosingGuide) return {kind:'local', answer:productGuide.trim()} as const
+  if (choosingProposal) {
+    const proposal = [...history].reverse().find(turn => turn.role === 'assistant' && turn.draftId)
+    if (proposal) return {kind:'local', answer:proposal.content, draftId:proposal.draftId} as const
+  }
   if (confirmsGuide || requestsGuideAgain) return {kind: 'local', answer: productGuide.trim()} as const
   if (asksToResend) {
-    if (latest?.role === 'assistant' && latest.content.trim() && !clarificationMessages.has(latest.content)) {
-      return {kind: 'local', answer: latest.content} as const
+    const explicitLast = /^(?:ultima resposta|resposta anterior)$/.test(target)
+    const vagueReference = /^(?:isso|isto|aquilo|ela|ele|esse|essa|mesma coisa|o mesmo)$/.test(target)
+    const hasGuide = history.some(turn => turn.role === 'assistant' && turn.content.trimStart().startsWith('# Guia do Ophiuchus'))
+    const proposal = [...history].reverse().find(turn => turn.role === 'assistant' && turn.draftId)
+    if (!explicitLast && vagueReference && hasGuide && proposal) return {kind:'clarify', answer:resendChoice} as const
+    if (/^proposta$/.test(target) && proposal) return {kind:'local', answer:proposal.content, draftId:proposal.draftId} as const
+    if ((!target || vagueReference || explicitLast) && latest?.role === 'assistant' && latest.content.trim() && !clarificationMessages.has(latest.content)) {
+      return {kind: 'local', answer: latest.content, draftId: latest.draftId} as const
     }
     return {kind: 'clarify', answer: resendQuestion} as const
   }
@@ -56,6 +81,7 @@ function resolveContinuation(text: string, history: HistoryTurn[], inProject: bo
     const diagnostic = /\b(?:TypeError|SyntaxError|ReferenceError|ECONNRESET|ENOENT|ERR_[A-Z_]+)\b/.test(recent)
     const identifiesError = diagnostic || namedFile && /\b(?:erro|bug|falh\w*|exception|regressao|stack trace)\b/i.test(recent)
     if (!inProject || !identifiesError || latest?.content === correctionQuestion) return {kind: 'clarify', answer: correctionQuestion} as const
+    return {kind: 'engineering'} as const
   }
   if (/^(?:isso|isto|esse|essa|o mesmo|a mesma coisa|faz isso|faca isso|pode|vai|manda|mande|pode mandar|arruma ai)(?: por favor)?$/.test(text)) {
     return {kind: 'clarify', answer: scopeQuestion} as const
@@ -112,13 +138,19 @@ export function routeIntent(prompt: string, history: HistoryTurn[] = [], now = n
     }
   }
 
-  const mutation = /\b(?:crie|cria|implemente|implementa|corrija|corrige|conserte|conserta|adicione|adiciona|remova|altere|mude|refatore|gere|escreva|ajuste|fix|implement|build|add|create)\b/
-  const asksHow = /^(?:como (?:eu |posso )?|how (?:do i |can i ))/
-  if (mutation.test(text) && !asksHow.test(text)) {
+  const instruction = question.replace(/^(?:por favor[ ,]+|preciso que (?:voce )?|quero que (?:voce )?|gostaria que (?:voce )?|(?:voce )?(?:pode|consegue|poderia) (?:me )?)+/, '')
+  const change = /^(?:crie|cria|criar|implemente|implementa|implementar|corrija|corrige|corrigir|conserte|conserta|consertar|arrume|adicione|adiciona|adicionar|remova|remover|altere|alterar|mude|refatore|refatorar|gere|escreva|ajuste|simplifique|transforme|melhore|desenvolva|fix|implement|build|add|create)\s+(.+)$/.exec(instruction)
+  if (change) {
+    const target = change[1].replace(/(?:,? por favor| para mim| pra mim| ai| aqui)$/, '')
+    if (/^(?:os? |as? )?(?:algo|alguma coisa|coisa|negocio|codigo|projeto|app|sistema|arquivos?|erros?|bugs?|problemas?|resto|tudo|outro|outra|outros|outras|o mesmo|mesma coisa)$/.test(target) ||
+      /^(?:isso|isto|aquilo|ele|ela|esse|essa)(?:$| (?!erro$|bug$))/.test(target) ||
+      /^(?:o|a|os|as) que (?:falei|pedi|conversamos|combinamos|falta|ficou faltando)$/.test(target)) {
+      return {kind:'clarify', answer:scopeQuestion} as const
+    }
     return {kind: 'engineering'} as const
   }
-  if (/^(?:o que|por que|porque|qual|quais|quando|onde|quem|quanto|como|que |(?:me )?expli(?:que|ca)|analise|resuma|compare|oi|ola|obrigad[oa]|what|why|how|who|when|where|explain)\b/.test(text) || prompt.trim().endsWith('?')) {
+  if (/^(?:o que|por que|porque|qual|quais|quando|onde|quem|quanto|como|que |(?:me )?expli(?:que|ca)|analise|resuma|compare|oi|ola|obrigad[oa]|what|why|how|who|when|where|explain)\b/.test(question)) {
     return {kind: 'direct'} as const
   }
-  return {kind: 'engineering'} as const
+  return {kind: 'uncertain', answer: scopeQuestion} as const
 }

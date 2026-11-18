@@ -128,7 +128,11 @@ export default function App(){
  if(intent.kind!=='engineering'){
   setChat(turns=>[...turns,{role:'user',content:sent}]);setPrompt(current=>current.trim()===sent?'':current);
   try{
-   const answer=intent.kind==='direct'?(await api<{answer:string}>('/chat/direct',{prompt:sent,history,binding,confirmSend:true})).answer:intent.answer;
+   let answer:string
+   if(intent.kind==='direct')answer=(await api<{answer:string}>('/chat/direct',{prompt:sent,history,binding,confirmSend:true})).answer
+   else if(intent.kind==='uncertain'&&binding?.providerId&&binding.providerId!=='mock'&&binding.modelId){
+    answer=(await api<{answer:string}>('/chat/direct',{prompt:sent,history,binding,confirmSend:true,resolveIntent:true}).catch(()=>null))?.answer||intent.answer
+   }else answer=intent.answer
    if(epoch===uiEpoch.current)setChat(turns=>[...turns,{role:'assistant',content:answer}]);
   }catch(e){if(epoch===uiEpoch.current)setChat(turns=>[...turns,{role:'assistant',content:(e as Error).message,error:true}]);}
   return;
