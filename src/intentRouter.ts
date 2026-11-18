@@ -36,7 +36,7 @@ function resolveContinuation(text: string, history: HistoryTurn[], inProject: bo
   const asksToResend = /^(?:pode |voce pode )?(?:(?:me )?(?:manda|mande|mandar|envie|envia|enviar|reenvie|reenvia|reenviar|repita|repete|repetir|mostre|mostra|mostrar)(?:\s+(?:isso|isto|ele|ela|a (?:ultima )?resposta))?\s+(?:novamente|de novo|outra vez)|(?:me )?(?:reenvie|reenvia|repita|repete)(?:\s+(?:isso|a (?:ultima )?resposta))?|de novo|novamente)(?: por favor)?$/.test(text)
   const confirmsGuide = latest?.role === 'assistant' && latest.content === resendQuestion &&
     /^(?:o guia|o manual|a documentacao)(?: (?:complet[ao]|do ophiuchus))?$/.test(text)
-  const requestsGuideAgain = /^(?:me )?(?:manda|mande|envie|reenvie|repita) (?:de novo |novamente )?(?:o guia|o manual|a documentacao) (?:complet[ao] )?(?:do ophiuchus|de novo|novamente)$/.test(text)
+  const requestsGuideAgain = /^(?:(?:voce )?pode )?(?:me )?(?:manda|mande|mandar|envie|envia|enviar|reenvie|reenvia|reenviar|repita|repete|repetir) (?:de novo |novamente )?(?:o guia|o manual|a documentacao)(?: complet[ao])?(?: do ophiuchus)?(?: de novo| novamente)?(?: por favor)?$/.test(text)
   if (confirmsGuide || requestsGuideAgain) return {kind: 'local', answer: productGuide.trim()} as const
   if (asksToResend) {
     if (latest?.role === 'assistant' && latest.content.trim() && !clarificationMessages.has(latest.content)) {

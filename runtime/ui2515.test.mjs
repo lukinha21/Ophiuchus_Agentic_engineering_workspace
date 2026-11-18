@@ -35,3 +35,16 @@ test('late provider response after cancel records cost without resurrecting run 
  await executeStage(run,{generate:async()=>{run.status='CANCELLED';return {text:'old response',usage:{prompt_tokens:10,completion_tokens:2,total_tokens:12},finishReason:'stop'};}});
  assert.equal(run.status,'CANCELLED');assert.equal(run.stage,'discovery');assert.equal(run.artifacts.at(-1).integrity,'cancelled');assert.equal(run.artifacts.at(-1).usage.total_tokens,12);assert.deepEqual(run.artifacts.at(-1).fileProposals,[]);
 });
+
+test('guide requests resolve locally even if the resend modifier precedes the object',async()=>{
+ const result=await build({entryPoints:['src/intentRouter.ts'],bundle:true,platform:'node',format:'esm',write:false,loader:{'.md':'text'}});
+ const {routeIntent}=await import('data:text/javascript;base64,'+Buffer.from(result.outputFiles[0].text).toString('base64'));
+ const before=routeIntent('mande novamente o guia');
+ assert.equal(before.kind,'local');
+ assert.match(before.answer,/^# Guia do Ophiuchus/);
+ assert.match(before.answer,/## 11\./);
+ assert.deepEqual(routeIntent('mande o guia novamente'),before);
+ assert.deepEqual(routeIntent('pode me mandar o guia de novo?'),before);
+ assert.equal(routeIntent('mande novamente').kind,'clarify');
+ assert.notEqual(routeIntent('mande novamente o guia do meu projeto').kind,'local');
+});
