@@ -37,7 +37,7 @@ export function encodeImage(file:File):Promise<MediaImage>{
 
 export function imageIntent(prompt:string){
  const normalized=prompt.trim().normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase()
- const command=/^(?:por favor[, ]+)?(?:(?:voce|vc) )?(?:(?:pode|consegue|poderia) )?(?:me )?(?:gere|gera|gerar|crie|cria|criar|faca|faz|fazer|produza|desenhe) (?:uma? )?(?:imagem|ilustracao|foto|desenho|arte visual)\b/.exec(normalized)
+ const command=/^(?:por favor[, ]+)?(?:(?:voce|vc) )?(?:(?:pode|consegue|poderia) )?(?:me )?(?:gere|gera|gerar|crie|cria|criar|faca|faz|fazer|produza|desenhe) (?:(?:pra|para) mim )?(?:(?:um|uma|o|a) )?(?:imagem|ilustracao|foto|desenho|arte visual)\b/.exec(normalized)
  if(!command)return null
  let subject=normalized.slice(command[0].length).replace(/(?:,? por favor)[.!?]*$/,'').trim()
  if(/^(?:docker|oci|de container|de conteiner)\b/.test(subject))return null

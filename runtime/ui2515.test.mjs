@@ -89,7 +89,7 @@ test('creation without a named target asks before dispatch and offers safe compl
 
 test('main-chat image intent separates media requests from coding and incomplete prompts',async()=>{
  const {imageIntent}=await moduleFrom('src/chatMedia.ts');
- for(const prompt of ['Gere uma imagem de uma árvore','Você pode gerar uma ilustração de um foguete?','faz uma foto de um cão']){
+ for(const prompt of ['Gere uma imagem de uma árvore','Você pode gerar uma ilustração de um foguete?','faz uma foto de um cão','faça a imagem de um gato de botas','faz pra mim a imagem de um gato','crie o desenho de um barco']){
   assert.deepEqual(imageIntent(prompt),{kind:'generate',mode:'direct'});
  }
  assert.deepEqual(imageIntent('Crie uma imagem de uma árvore com um agente'),{kind:'generate',mode:'assisted'});
