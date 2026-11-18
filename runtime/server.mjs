@@ -108,7 +108,8 @@ export const server=http.createServer(async(req,res)=>{
   if(req.method==='POST'&&url.pathname==='/chat/images'){
    const input=await readBody(req,Math.ceil(maxImageInputBytes/3)*4+40000);
    if(input?.confirmSend!==true)throw Error('Autorize o envio ao Google Gemini.');
-   const {mode,model,refinerModel,image}=input;
+   const {mode,refinerModel,image}=input;
+   const model=mode!=='analyse'&&input.useConfiguredModel===true?(bindings['image-generator']?.modelId??input.model):input.model;
    if(!['analyse','direct','assisted'].includes(mode))throw Error('Selecione uma operação de imagem.');
    if(typeof input.prompt!=='string'||!input.prompt.trim()||input.prompt.length>4000)throw Error('Informe um pedido de até 4.000 caracteres.');
    if(mode==='analyse'?!image:image!==undefined)throw Error(mode==='analyse'?'Anexe uma imagem para analisar.':'Use a descrição para gerar uma imagem.');
@@ -180,8 +181,17 @@ export const server=http.createServer(async(req,res)=>{
   }
   if(req.method==='GET'&&url.pathname==='/execution-options')return json(res,200,executionOptions);
   if(req.method==='PUT'&&url.pathname==='/execution-options'){executionOptions=normalizeOptions(await readBody(req));await saveOptions();return json(res,200,executionOptions);}
+  if(req.method==='GET'&&url.pathname==='/image-settings')return json(res,200,{modelId:bindings['image-generator']?.modelId??null});
+  if(req.method==='PUT'&&url.pathname==='/image-settings'){
+   const body=await readBody(req);
+   const modelId=typeof body?.modelId==='string'?body.modelId.trim():'';
+   if(!/^[a-zA-Z0-9._-]{1,128}$/.test(modelId))throw Error('Informe um identificador de modelo Gemini válido.');
+   bindings={...bindings,'image-generator':{providerId:'google',modelId}};
+   await saveBindings();
+   return json(res,200,{modelId});
+  }
   if(req.method==='GET'&&url.pathname==='/bindings')return json(res,200,bindings);
-  if(req.method==='PUT'&&url.pathname==='/bindings'){const body=await readBody(req);if(!body||typeof body!=='object'||Array.isArray(body))throw Error('Bindings inválidos');const next={};for(const [agentId,binding] of Object.entries(body)){if(!/^[a-z0-9_-]{1,64}$/i.test(agentId)||!binding||typeof binding!=='object'||typeof binding.providerId!=='string'||typeof binding.modelId!=='string'||binding.modelId.length>180||!binding.modelId.trim())throw Error('Binding inválido');if(!listProviders().some(p=>p.id===binding.providerId))throw Error('Provedor não suportado');next[agentId]={providerId:binding.providerId,modelId:binding.modelId};}bindings=next;await saveBindings();return json(res,200,bindings);}
+  if(req.method==='PUT'&&url.pathname==='/bindings'){const body=await readBody(req);if(!body||typeof body!=='object'||Array.isArray(body))throw Error('Bindings inválidos');const next={};for(const [agentId,binding] of Object.entries(body)){if(agentId==='image-generator')continue;if(!/^[a-z0-9_-]{1,64}$/i.test(agentId)||!binding||typeof binding!=='object'||typeof binding.providerId!=='string'||typeof binding.modelId!=='string'||binding.modelId.length>180||!binding.modelId.trim())throw Error('Binding inválido');if(!listProviders().some(p=>p.id===binding.providerId))throw Error('Provedor não suportado');next[agentId]={providerId:binding.providerId,modelId:binding.modelId};}if(bindings['image-generator'])next['image-generator']=bindings['image-generator'];bindings=next;await saveBindings();return json(res,200,bindings);}
   const modelMatch=url.pathname.match(/^\/providers\/([a-z0-9-]+)\/models$/);
   if(req.method==='GET'&&modelMatch){const models=await listModels(modelMatch[1],{signal:AbortSignal.timeout(12000)});return json(res,200,models);}
   if(req.method==='GET'&&url.pathname==='/metrics'){const days=Number(url.searchParams.get('days')||7);if(![1,7,30].includes(days))return json(res,400,{error:'Período inválido'});return json(res,200,summarizeMetrics(runs,days));}

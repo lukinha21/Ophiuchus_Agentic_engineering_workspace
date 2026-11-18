@@ -86,9 +86,9 @@ async function storeChatImage(image:MediaImage){
  return id
 }
 
-export async function sendChatImage(prompt:string,file:File|null,mode:'analyse'|'direct'|'assisted'):Promise<MediaTurn>{
+export async function sendChatImage(prompt:string,file:File|null,mode:'analyse'|'direct'|'assisted',imageModel=defaultImageModel):Promise<MediaTurn>{
  const result=await api<MediaResult>('/chat/images',{
-  mode,prompt,model:mode==='analyse'?defaultVisionModel:defaultImageModel,
+  mode,prompt,model:mode==='analyse'?defaultVisionModel:imageModel,useConfiguredModel:mode!=='analyse',
   ...(file?{image:await encodeImage(file)}:{}),
   ...(mode==='assisted'?{refinerModel:defaultVisionModel}:{}),
   confirmSend:true,

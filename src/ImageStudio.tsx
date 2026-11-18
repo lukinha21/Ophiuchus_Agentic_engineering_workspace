@@ -1,19 +1,20 @@
-import {useRef,useState} from 'react'
+import {useEffect,useRef,useState} from 'react'
 import type {ClipboardEvent} from 'react'
 import {Download,Image as ImageIcon,Paperclip,Search,Sparkles,X} from 'lucide-react'
 import ArtifactMarkdown from './ArtifactMarkdown'
 import {api} from './runtimeClient'
-import {defaultImageModel,defaultVisionModel,encodeImage,imageDataUrl,isSupportedImage} from './chatMedia'
+import {defaultVisionModel,encodeImage,imageDataUrl,isSupportedImage} from './chatMedia'
 import type {MediaResult} from './chatMedia'
 import './image-studio.css'
 
 type Mode = 'analyse' | 'direct' | 'assisted'
 type Entry = {id: string; result: MediaResult}
 const modeLabel = {analyse:'Análise',direct:'Direta',assisted:'Com agente'}
-export default function ImageStudio(){
+export default function ImageStudio({configuredImageModel}:{configuredImageModel:string}){
  const [mode,setMode]=useState<'analyse'|'generate'>('analyse')
  const [textModel,setTextModel]=useState(defaultVisionModel)
- const [imageModel,setImageModel]=useState(defaultImageModel)
+ const [imageModel,setImageModel]=useState(configuredImageModel)
+ useEffect(()=>setImageModel(configuredImageModel),[configuredImageModel])
  const [prompt,setPrompt]=useState('')
  const [file,setFile]=useState<File|null>(null)
  const [busy,setBusy]=useState<Mode|null>(null)

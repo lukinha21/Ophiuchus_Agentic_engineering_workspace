@@ -8,7 +8,7 @@ import type { RuntimeRun } from './runtimeClient'
 import Dashboard from './Dashboard'
 import ImageStudio from './ImageStudio'
 import ChatImage from './ChatImage'
-import {imageIntent,isSupportedImage,sendChatImage} from './chatMedia'
+import {defaultImageModel,imageIntent,isSupportedImage,sendChatImage} from './chatMedia'
 import type {MediaTurn} from './chatMedia'
 import SettingsCenter from './SettingsCenter'
 import {routeIntent} from './intentRouter'
@@ -103,6 +103,9 @@ export default function App(){
   try{localStorage.setItem(historyKey,JSON.stringify(history));setStorageError(false)}
   catch{setStorageError(true)}
  },[history])
+ const [imageModel,setImageModel]=useState(defaultImageModel)
+ useEffect(()=>{let active=true;void api<{modelId:string|null}>('/image-settings').then(saved=>{if(active&&saved.modelId)setImageModel(saved.modelId)}).catch(()=>{});return()=>{active=false}},[])
+ const saveImageModel=async(modelId:string)=>{const saved=await api<{modelId:string}>('/image-settings',{modelId},'PUT',AbortSignal.timeout(8000));setImageModel(saved.modelId)}
  const composerRef=useRef<HTMLTextAreaElement>(null)
  const imageInput=useRef<HTMLInputElement>(null)
  const [attachment,setAttachment]=useState<File|null>(null)
@@ -148,7 +151,7 @@ export default function App(){
   const file=attachment
   const request=sentText||'Descreva esta imagem.'
   const visible=file?request+'\n\nImagem anexada: '+file.name:request
-  const job=():Promise<MediaTurn>=>intent?.kind==='clarify'?Promise.resolve({text:'O que você quer que apareça na imagem? Descreva a cena ou o assunto.'}):sendChatImage(request,file,file?'analyse':intent?.kind==='generate'?intent.mode:'direct')
+  const job=():Promise<MediaTurn>=>intent?.kind==='clarify'?Promise.resolve({text:'O que você quer que apareça na imagem? Descreva a cena ou o assunto.'}):sendChatImage(request,file,file?'analyse':intent?.kind==='generate'?intent.mode:'direct',imageModel)
   setSubmitting(true);setPrompt('');clearAttachment()
   try{
    if(projectStatus.active){await projectRef.current?.submitMedia(visible,job);return}
@@ -227,8 +230,8 @@ export default function App(){
    <div className="v5-live"><span className={`v5-led ${running?'pulse':''}`}/>{projectStatus.busy?'Trabalhando no projeto':projectStatus.active?projectStatus.name:running?'Execução em tempo real':finished?'Execução concluída':cancelled?'Execução cancelada':'Sistema pronto'}</div>
    <div className="v5-top-actions">{view==='console'&&<><button className="v5-mode-toggle" title={help.modes} onClick={()=>setPref('mode',prefs.mode==='focus'?'engineering':'focus')}><LayoutGrid size={15}/>{prefs.mode==='focus'?'Modo Foco':'Modo Engenharia'}</button></>}</div>
   </header>
-  <div className="v5-page" style={{display:view==='images'?undefined:'none'}}><ImageStudio/></div>
-  {view==='images'?null:view==='dashboard'?<div className="v5-page"><Dashboard onGoConsole={()=>setView('console')}/></div>:view==='settings'?<div className="v5-page"><SettingsCenter agents={agents} onUpdate={updateBinding} onBack={()=>setView('console')}/></div>:<div ref={workspaceRef} style={{'--v6-agents':`${panelSizes.agents}px`,'--v6-inspector':`${panelSizes.inspector}px`} as React.CSSProperties} className={`v5-workspace v6-workspace ${!prefs.sidebar&&!showHistory?'no-rail':''} ${effectiveInspector?'with-inspector':''} ${narrow?'v6-narrow':''}`}>
+  <div className="v5-page" style={{display:view==='images'?undefined:'none'}}><ImageStudio configuredImageModel={imageModel}/></div>
+  {view==='images'?null:view==='dashboard'?<div className="v5-page"><Dashboard onGoConsole={()=>setView('console')}/></div>:view==='settings'?<div className="v5-page"><SettingsCenter agents={agents} imageModel={imageModel} onSaveImageModel={saveImageModel} onUpdate={updateBinding} onBack={()=>setView('console')}/></div>:<div ref={workspaceRef} style={{'--v6-agents':`${panelSizes.agents}px`,'--v6-inspector':`${panelSizes.inspector}px`} as React.CSSProperties} className={`v5-workspace v6-workspace ${!prefs.sidebar&&!showHistory?'no-rail':''} ${effectiveInspector?'with-inspector':''} ${narrow?'v6-narrow':''}`}>
    {showHistory?<aside className="v5-project-sidebar history-panel">
     <ChatHistory chats={history.chats} onDelete={deleteChat} busy={switchBusy||running} onOpen={entry=>void openArchivedChat(entry)}
      activeIds={[projectChatId||'',activeRunId||'']} currentId={projectStatus.active?projectChatId:activeRunId||plainChatId} storageError={storageError}/>

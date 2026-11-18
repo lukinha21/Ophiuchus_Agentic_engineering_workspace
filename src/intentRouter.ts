@@ -16,6 +16,7 @@ function answerProductQuestion(question: string) {
   if (requestsGuide && isComprehensive && aboutOphiuchus.test(question)) return productGuide.trim()
   if (/\b(?:debug|diagnostico|inspector|modo engenharia|entrada \/ saida)\b/.test(question)) return productHelp.debug
   if (/\bdashboard\b/.test(question)) return productHelp.dashboard
+  if (/\b(?:modelo|gerador)\b.*\b(?:imagem|imagens)\b|\bmodelos de imagem\b/.test(question)) return productHelp.images
   if (/\b(?:cofre|chave (?:de )?api|conectar (?:o )?(?:gemini|provedor))\b/.test(question)) return productHelp.vault
   if (/\b(?:historico|retomar (?:uma |a )?conversa)\b/.test(question)) return productHelp.history
   if (/\b(?:configur\w*|alter\w*|modific\w*|mud\w*|troc\w*|escolh\w*)\b.*\b(?:agentes?|modelos?)\b|\bagentes e modelos\b/.test(question)) return productHelp.agents
