@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {listProviders,listModels,generateText} from './providers.mjs';
+import {listProviders,listModels,generateText,generateGeminiMedia} from './providers.mjs';
 test('catalog reports configuration without leaking keys',()=>{const result=listProviders({OPENAI_API_KEY:'supersecret'});assert.equal(result.find(p=>p.id==='openai').configured,true);assert.equal(JSON.stringify(result).includes('supersecret'),false);});
 test('models are discovered using a mocked provider',async()=>{const models=await listModels('openai',{env:{OPENAI_API_KEY:'test'},fetchImpl:async(url,options)=>{assert.match(url,/\/models$/);assert.equal(options.headers.Authorization,'Bearer test');return {ok:true,json:async()=>({data:[{id:'model-b'},{id:'model-a'}]})};}});assert.deepEqual(models.map(m=>m.id),['model-a','model-b']);});
 test('adapter returns usage and text',async()=>{const result=await generateText({providerId:'openai',model:'demo',messages:[{role:'user',content:'oi'}]},{env:{OPENAI_API_KEY:'test'},fetchImpl:async()=>({ok:true,json:async()=>({choices:[{message:{content:'Olá'}}],usage:{total_tokens:9}})})});assert.equal(result.text,'Olá');assert.equal(result.usage.total_tokens,9);});
@@ -13,4 +13,28 @@ test('empty truncated responses retain finish reason and usage for bounded recov
 test('larger stage output is transmitted and remains hard bounded',async()=>{
  let body;const options={env:{GEMINI_API_KEY:'test'},fetchImpl:async(url,o)=>{body=JSON.parse(o.body);return {ok:true,json:async()=>({candidates:[{content:{parts:[{text:'ok'}]},finishReason:'STOP'}]})}}};
  const args={providerId:'google',model:'gemini-test',messages:[{role:'user',content:'oi'}],maxOutputTokens:16384};await generateText(args,options);assert.equal(body.generationConfig.maxOutputTokens,16384);await assert.rejects(generateText({...args,maxOutputTokens:16385},options),/Limite/);
+});
+
+test('Gemini media sends image bytes for analysis and returns provider image bytes for generation',async()=>{
+ const png={mimeType:'image/png',data:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jXH8AAAAASUVORK5CYII='};
+ const requests=[];
+ const options={env:{GEMINI_API_KEY:'test'},fetchImpl:async(url,request)=>{
+  const body=JSON.parse(request.body);requests.push({url,body});
+  const parts=body.contents[0].parts[1]?[{text:'Uma imagem de teste.'}]:[{inlineData:png}];
+  return {ok:true,json:async()=>({candidates:[{content:{parts}}]})};
+ }};
+ assert.deepEqual(await generateGeminiMedia({model:'vision-test',prompt:'Analise.',image:png},options),{text:'Uma imagem de teste.'});
+ assert.deepEqual(requests[0].body.contents[0].parts[1],{inlineData:png});
+ assert.deepEqual(await generateGeminiMedia({model:'image-test',prompt:'Uma imagem.'},options),{image:png});
+ assert.deepEqual(requests[1].body.generationConfig.responseModalities,['IMAGE']);
+ assert.match(requests[1].url,/image-test:generateContent$/);
+ await assert.rejects(generateGeminiMedia({model:'vision-test',prompt:'Analise.',image:{...png,mimeType:'image/jpeg'}},options),/formato informado/);
+ assert.equal(requests.length,2);
+});
+
+test('Gemini media rejects text-only image outputs and preserves a provider quota error',async()=>{
+ const args={model:'image-test',prompt:'Uma árvore'};
+ const env={GEMINI_API_KEY:'test'};
+ await assert.rejects(generateGeminiMedia(args,{env,fetchImpl:async()=>({ok:true,json:async()=>({candidates:[{content:{parts:[{text:'Só texto'}]}}]})})}),/não retornou uma imagem/);
+ await assert.rejects(generateGeminiMedia(args,{env,fetchImpl:async()=>({ok:false,status:429,json:async()=>({})})}),/HTTP 429/);
 });

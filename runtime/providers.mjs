@@ -34,6 +34,48 @@ export async function listModels(id,{env=process.env,fetchImpl=fetch,signal}={})
  if(!Array.isArray(models))throw Error('Catálogo inválido');rememberCapabilities(id,models);
  return models.filter(m=>typeof m.name==='string'||typeof m.id==='string').filter(m=>p.kind!=='gemini'||m.supportedGenerationMethods?.includes('generateContent')).map(m=>({id:p.kind==='gemini'?m.name.replace(/^models\//,''):m.id,providerId:id,label:m.displayName||m.name||m.id})).sort((a,b)=>a.id.localeCompare(b.id));
 }
+const imageMimeTypes=new Set(['image/png','image/jpeg','image/webp']);
+export const maxImageInputBytes=4*1024*1024;
+const maxImageOutputBytes=12*1024*1024;
+
+function validatedImage(part,limit){
+ if(!imageMimeTypes.has(part?.mimeType)||typeof part.data!=='string'||part.data.length>Math.ceil(limit/3)*4||
+   !/^[0-9A-Za-z+/]+={0,2}$/.test(part.data))throw Error('Imagem inválida ou acima do limite. Use PNG, JPEG ou WebP.');
+ const bytes=Buffer.from(part.data,'base64');
+ const valid=bytes.length<=limit&&bytes.toString('base64')===part.data&&(
+  part.mimeType==='image/png'?bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])):
+  part.mimeType==='image/jpeg'?bytes[0]===255&&bytes[1]===216&&bytes[2]===255:
+  bytes.toString('ascii',0,4)==='RIFF'&&bytes.toString('ascii',8,12)==='WEBP');
+ if(!valid)throw Error('O conteúdo da imagem não corresponde ao formato informado.');
+ return {mimeType:part.mimeType,data:part.data};
+}
+
+export async function generateGeminiMedia({model,prompt,image},{env=process.env,fetchImpl=fetch,signal}={}){
+ if(typeof model!=='string'||!/^[a-zA-Z0-9._-]{1,128}$/.test(model))throw Error('Informe um modelo Gemini válido.');
+ const provider=resolveProvider('google',env);
+ if(!provider.configured)throw Error('Configure o Google Gemini e desbloqueie o cofre em Provedores.');
+ const parts=[{text:prompt}];
+ if(image!==undefined)parts.push({inlineData:validatedImage(image,maxImageInputBytes)});
+ const body={contents:[{role:'user',parts}],generationConfig:image===undefined?{responseModalities:['IMAGE']}:{maxOutputTokens:4096}};
+ const token=await googleAccessToken(env,fetchImpl);
+ const authorization=token?{Authorization:'Bearer '+token}:headers(provider);
+ const response=await fetchImpl(provider.baseUrl+'/models/'+model+':generateContent',{
+  method:'POST',headers:{...authorization,'Content-Type':'application/json'},body:JSON.stringify(body),signal
+ });
+ await checkResponse(response,provider.name);
+ const payload=await response.json();
+ const candidate=payload.candidates?.[0];
+ const visible=Array.isArray(candidate?.content?.parts)?candidate.content.parts.filter(part=>part&&!part.thought):[];
+ const text=visible.map(part=>typeof part.text==='string'?part.text:'').join('\n').trim();
+ if(image!==undefined){
+  if(!text)throw Error('O modelo não retornou uma análise. Verifique se ele aceita imagens.');
+  return {text};
+ }
+ const generated=visible.find(part=>part.inlineData);
+ if(!generated)throw Error('O modelo não retornou uma imagem. Verifique o modelo de geração e o pedido.');
+ return {image:validatedImage(generated.inlineData,maxImageOutputBytes)};
+}
+
 function normalizeMessages(messages){return messages.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:String(m.content)}]}));}
 export async function generateText({providerId,model,messages,maxOutputTokens=600,allowEmptyTruncated=false,responseContract,policy={}},{env=process.env,fetchImpl=fetch,signal}={}){
  const p=resolveProvider(providerId,env);if(!p.configured)throw Error('Provedor não configurado no servidor');

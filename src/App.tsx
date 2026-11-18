@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
-import { MessageSquarePlus, Activity, BarChart3, Settings2, Zap, Square, ChevronDown, ChevronRight, Code2, ShieldCheck, FileText, BrainCircuit, Sparkles, CircleHelp, PanelRightOpen, Check, Clock3, ArrowUp, Workflow, Eye, RotateCcw, SlidersHorizontal, Cpu, ListTree, LayoutGrid, X, Terminal, MessageCircle, CircleDot, Search, Filter, Layers3, Gauge, Timer, GitBranch, ArrowRight, PanelLeftClose, FolderOpen, Bot, UserRound, Moon, Sun } from 'lucide-react'
+import { Image as ImageIcon, MessageSquarePlus, Activity, BarChart3, Settings2, Zap, Square, ChevronDown, ChevronRight, Code2, ShieldCheck, FileText, BrainCircuit, Sparkles, CircleHelp, PanelRightOpen, Check, Clock3, ArrowUp, Workflow, Eye, RotateCcw, SlidersHorizontal, Cpu, ListTree, LayoutGrid, X, Terminal, MessageCircle, CircleDot, Search, Filter, Layers3, Gauge, Timer, GitBranch, ArrowRight, PanelLeftClose, FolderOpen, Bot, UserRound, Moon, Sun } from 'lucide-react'
 import type { AgentDefinition, RunAgentState, RunEvent, RunSnapshot, TaskDefinition, AgentStatus } from './domain'
 import { createTasks, defaultAgents } from './mockOrchestrator'
 import { api, projectRun } from './runtimeClient'
 import type { RuntimeRun } from './runtimeClient'
 import Dashboard from './Dashboard'
+import ImageStudio from './ImageStudio'
 import SettingsCenter from './SettingsCenter'
 import {routeIntent} from './intentRouter'
 import ClarificationOptions from './ClarificationOptions'
@@ -45,7 +46,7 @@ export default function App(){
  const [reading,setReading]=useState(()=>{try{return localStorage.getItem('ophiuchus.reading')==='large'?'large':'normal'}catch{return 'normal'}})
  useEffect(()=>{try{localStorage.setItem('ophiuchus.reading',reading)}catch{}},[reading])
  useEffect(()=>{try{localStorage.setItem('ophiuchus.theme',theme)}catch{}document.documentElement.style.colorScheme=darkTheme?'dark':'light';},[theme])
- const [view,setView]=useState<'console'|'dashboard'|'settings'>(()=>new URLSearchParams(window.location.search).has('code')?'settings':'console')
+ const [view,setView]=useState<'console'|'dashboard'|'settings'|'images'>(()=>new URLSearchParams(window.location.search).has('code')?'settings':'console')
  const [agents,setAgents]=useState<AgentDefinition[]>(defaultAgents)
  const [states,setStates]=useState<RunAgentState[]>(defaultAgents.map(a=>({agentId:a.id,status:'IDLE',currentTask:'Aguardando execução',lastEvent:'Sem atividade',progress:0})))
  const [tasks,setTasks]=useState<TaskDefinition[]>(createTasks())
@@ -185,6 +186,7 @@ export default function App(){
   <aside className="v5-dock" aria-label="Navegação"><div className="v5-logo" title="Ophiuchus"><BrandMark/></div>
    <button title="Console" aria-label="Console" className={view==='console'?'active':''} onClick={()=>setView('console')}><MessageCircle size={20}/></button>
    <button title="Histórico de conversas" aria-label="Histórico de conversas" aria-expanded={showHistory&&view==='console'} className={showHistory&&view==='console'?'active':''} onClick={()=>{setShowHistory(view!=='console'||!showHistory);setView('console')}}><Clock3 size={20}/></button>
+   <button title="Chat de imagens" aria-label="Chat de imagens" className={view==='images'?'active':''} onClick={()=>setView('images')}><ImageIcon size={20}/></button>
    <button title="Dashboard" aria-label="Dashboard" className={view==='dashboard'?'active':''} onClick={()=>setView('dashboard')}><BarChart3 size={20}/></button>
    <button title="Provedores e agentes" aria-label="Configurações de provedores" className={view==='settings'?'active':''} onClick={()=>setView('settings')}><Settings2 size={20}/></button>
    <button title="Arquivos do projeto" aria-label="Arquivos do projeto" className={!showHistory&&prefs.sidebar&&view==='console'?'active':''} onClick={()=>{setView('console');setShowHistory(false);setPref('sidebar',showHistory||!prefs.sidebar)}}><FolderOpen size={20}/></button><div className="v5-dock-spacer"/><button title="Preferências visuais" aria-label="Preferências visuais" onClick={()=>setShowPreferences(true)}><SlidersHorizontal size={20}/></button>
@@ -194,7 +196,8 @@ export default function App(){
    <div className="v5-live"><span className={`v5-led ${running?'pulse':''}`}/>{projectStatus.busy?'Trabalhando no projeto':projectStatus.active?projectStatus.name:running?'Execução em tempo real':finished?'Execução concluída':cancelled?'Execução cancelada':'Sistema pronto'}</div>
    <div className="v5-top-actions">{view==='console'&&<><button className="v5-mode-toggle" title={help.modes} onClick={()=>setPref('mode',prefs.mode==='focus'?'engineering':'focus')}><LayoutGrid size={15}/>{prefs.mode==='focus'?'Modo Foco':'Modo Engenharia'}</button></>}</div>
   </header>
-  {view==='dashboard'?<div className="v5-page"><Dashboard onGoConsole={()=>setView('console')}/></div>:view==='settings'?<div className="v5-page"><SettingsCenter agents={agents} onUpdate={updateBinding} onBack={()=>setView('console')}/></div>:<div ref={workspaceRef} style={{'--v6-agents':`${panelSizes.agents}px`,'--v6-inspector':`${panelSizes.inspector}px`} as React.CSSProperties} className={`v5-workspace v6-workspace ${!prefs.sidebar&&!showHistory?'no-rail':''} ${effectiveInspector?'with-inspector':''} ${narrow?'v6-narrow':''}`}>
+  <div className="v5-page" style={{display:view==='images'?undefined:'none'}}><ImageStudio/></div>
+  {view==='images'?null:view==='dashboard'?<div className="v5-page"><Dashboard onGoConsole={()=>setView('console')}/></div>:view==='settings'?<div className="v5-page"><SettingsCenter agents={agents} onUpdate={updateBinding} onBack={()=>setView('console')}/></div>:<div ref={workspaceRef} style={{'--v6-agents':`${panelSizes.agents}px`,'--v6-inspector':`${panelSizes.inspector}px`} as React.CSSProperties} className={`v5-workspace v6-workspace ${!prefs.sidebar&&!showHistory?'no-rail':''} ${effectiveInspector?'with-inspector':''} ${narrow?'v6-narrow':''}`}>
    {showHistory?<aside className="v5-project-sidebar history-panel">
     <ChatHistory chats={history.chats} onDelete={deleteChat} busy={switchBusy||running} onOpen={entry=>void openArchivedChat(entry)}
      activeIds={[projectChatId||'',activeRunId||'']} currentId={projectStatus.active?projectChatId:activeRunId||plainChatId} storageError={storageError}/>

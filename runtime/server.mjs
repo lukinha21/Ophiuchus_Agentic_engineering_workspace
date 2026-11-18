@@ -12,7 +12,7 @@ import {resolve,dirname} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {createRun,startRun,completeStage,approve,reportFailure,cancel} from './orchestrator.mjs';
 import {capabilities} from './model-capabilities.mjs';
-import {generateText,listProviders,listModels} from './providers.mjs';
+import {generateGeminiMedia,generateText,listProviders,listModels,maxImageInputBytes} from './providers.mjs';
 import {vaultStatus,unlockVault,lockVault,saveCredential,removeCredential,saveCustomEndpoint} from './vault.mjs';
 import {executeStage} from './executor.mjs';
 import {extractProposals,listWorkspace,readWorkspaceFile,applyProposals} from './workspace.mjs';
@@ -54,7 +54,7 @@ for(const run of Object.values(runs)){if(run.sequence?.status==='RUNNING'){run.s
 let saving=Promise.resolve();
 const save=()=>{const snapshot=JSON.stringify(runs,null,2);const pending=saving.catch(()=>{}).then(async()=>{await mkdir(dirname(DB),{recursive:true});const temporary=DB+'.'+randomUUID()+'.tmp';await writeFile(temporary,snapshot,{mode:0o600});await rename(temporary,DB);});saving=pending;return pending;};
 const json=(res,code,value)=>{res.writeHead(code,{'content-type':'application/json; charset=utf-8','cache-control':'no-store'});res.end(JSON.stringify(value));};
-const readBody=async(req)=>{let text='';for await(const chunk of req){text+=chunk;if(text.length>1024*1024)throw Error('Payload grande demais');}return JSON.parse(text||'{}');};
+const readBody=async(req,maxBytes=1024*1024)=>{let text='';for await(const chunk of req){text+=chunk;if(text.length>maxBytes)throw Error('Payload grande demais');}return JSON.parse(text||'{}');};
 export const server=http.createServer(async(req,res)=>{
  try{
   // Reject cross-site browser requests, including local-network origins.
@@ -104,6 +104,31 @@ export const server=http.createServer(async(req,res)=>{
     if(req.method==='POST'&&['apply','undo','test','deliver'].includes(draftAction))return json(res,200,await projects[draftAction](id,draftId,await readBody(req)));
    }
    return json(res,405,{error:'Ação do projeto não permitida'});
+  }
+  if(req.method==='POST'&&url.pathname==='/chat/images'){
+   const input=await readBody(req,Math.ceil(maxImageInputBytes/3)*4+40000);
+   if(input?.confirmSend!==true)throw Error('Autorize o envio ao Google Gemini.');
+   const {mode,model,refinerModel,image}=input;
+   if(!['analyse','direct','assisted'].includes(mode))throw Error('Selecione uma operação de imagem.');
+   if(typeof input.prompt!=='string'||!input.prompt.trim()||input.prompt.length>4000)throw Error('Informe um pedido de até 4.000 caracteres.');
+   if(mode==='analyse'?!image:image!==undefined)throw Error(mode==='analyse'?'Anexe uma imagem para analisar.':'Use a descrição para gerar uma imagem.');
+   if(typeof model!=='string'||!/^[a-zA-Z0-9._-]{1,128}$/.test(model))throw Error('Informe um modelo Gemini válido.');
+   if(mode==='assisted'&&(typeof refinerModel!=='string'||!/^[a-zA-Z0-9._-]{1,128}$/.test(refinerModel)))throw Error('Informe um modelo Gemini de texto para refinar a descrição.');
+   const controller=new AbortController();
+   res.once('close',()=>controller.abort());
+   const started=Date.now(),originalPrompt=input.prompt.trim();
+   let usedPrompt=originalPrompt;
+   if(mode==='assisted'){
+    const result=await generateText({providerId:'google',model:refinerModel,maxOutputTokens:2048,messages:[
+     {role:'system',content:'Refine apenas a descrição para geração de uma imagem. Preserve tema, restrições, estilo especificado e todo texto que deve aparecer. Esclareça composição, enquadramento e iluminação quando couber. Não mude o assunto, não acrescente marcas ou texto visual sem solicitação. Retorne somente a descrição final.'},
+     {role:'user',content:originalPrompt}
+    ]},{signal:AbortSignal.any([controller.signal,AbortSignal.timeout(35000)])});
+    if(result.finishReason==='length'||!result.text.trim()||result.text.length>6000)throw Error('O agente não devolveu uma descrição completa.');
+    usedPrompt=result.text.trim();
+   }
+   const signal=AbortSignal.any([controller.signal,AbortSignal.timeout(120000)]);
+   const media=await generateGeminiMedia({model,prompt:usedPrompt,image},{signal});
+   return json(res,200,{...media,mode,model,originalPrompt,usedPrompt,elapsedMs:Date.now()-started,calls:mode==='assisted'?2:1});
   }
   if(req.method==='POST'&&url.pathname==='/chat/direct'){
    const body=await readBody(req);
