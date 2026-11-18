@@ -1,8 +1,9 @@
 import productHelp from '../runtime/product-help.json' with {type: 'json'}
+import productGuide from '../runtime/product-guide.md?raw'
 
 function answerProductQuestion(question: string) {
   const asks = /^(?:como|onde|qual|quais|o que|me (?:explica|explique|fala|fale|mostra|mostre)|explique|descreva)\b/
-  const aboutOphiuchus = /\b(?:do ophiuchus|no ophiuchus|o ophiuchus|sua arquitetura|seu funcionamento|voce funciona|seus agentes|voce usa)\b/
+  const aboutOphiuchus = /\b(?:do ophiuchus|no ophiuchus|o ophiuchus|sua arquitetura|seu funcionamento|seu escopo|como voce funciona|voce funciona|seus agentes|voce usa)\b/
   const aboutExternalProject = /\b(?:do meu (?:app|projeto|sistema)|no meu (?:app|projeto|sistema)|deste projeto|desse projeto|dessa (?:aplicacao|funcao))\b/
   const alsoRequestsWork = /\be\s+(?:crie|adicione|implemente|corrija|remova|altere|refatore|gere|escreva)\b/
   if ((!asks.test(question) && !aboutOphiuchus.test(question)) ||
@@ -10,6 +11,9 @@ function answerProductQuestion(question: string) {
   if (/^(?:crie|adicione|implemente|corrija|altere|refatore|gere|escreva)\b/.test(question)) return undefined
   if (/^(?:como|me (?:ensina|ensine) a) (?:eu |posso )?(?:criar|adicionar|implementar|programar|construir)\b/.test(question)) return undefined
 
+  const requestsGuide = /\b(?:documentacao|guia|manual)\b/.test(question)
+  const isComprehensive = /\b(?:complet[ao]|detalhad[ao]|escopo|tudo|geral)\b/.test(question)
+  if (requestsGuide && isComprehensive && aboutOphiuchus.test(question)) return productGuide.trim()
   if (/\b(?:debug|diagnostico|inspector|modo engenharia|entrada \/ saida)\b/.test(question)) return productHelp.debug
   if (/\bdashboard\b/.test(question)) return productHelp.dashboard
   if (/\b(?:cofre|chave (?:de )?api|conectar (?:o )?(?:gemini|provedor))\b/.test(question)) return productHelp.vault
