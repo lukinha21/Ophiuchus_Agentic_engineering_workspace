@@ -102,3 +102,16 @@ test('main-chat image intent separates media requests from coding and incomplete
  assert.equal(imageIntent('Quero que crie uma imagem Docker'),null);
  assert.deepEqual(imageIntent('Quero que faça uma imagem'),{kind:'clarify'});
 });
+
+test('writing tasks and scene-by-scene corrections stay in chat', async()=>{
+ const result=await build({entryPoints:['src/intentRouter.ts'],loader:{'.md':'text'},bundle:true,platform:'node',format:'esm',write:false});
+ const {routeIntent}=await import('data:text/javascript;base64,'+Buffer.from(result.outputFiles[0].text).toString('base64'));
+ const opener='quero fazer um video do sistema ophiuchus mostrando suas funcionalidades e como usa ele e preciso de um prompt pra isso, o video vai ser um motion';
+ const scenes='um prompt de cena pos cena o que cada cena vai ter o que vai acontecer como vai ter transição, e esse motion vai ser feito usando puro html/js';
+ assert.deepEqual(routeIntent(opener+', ou seja eu quero '+scenes),{kind:'compose',format:'storyboard'});
+ assert.deepEqual(routeIntent('não é esse tipo de prompt q eu quero e sim um de cena por cena em HTML/JS',[{role:'user',content:opener},{role:'assistant',content:'Professional motion graphics showcase'}]),{kind:'compose',format:'storyboard'});
+ assert.deepEqual(routeIntent('Escreva uma documentação para o processo de suporte'),{kind:'compose',format:'documentation'});
+ assert.deepEqual(routeIntent('Para divulgar o produto, quero que faça um prompt'),{kind:'compose',format:'prompt'});
+ assert.notEqual(routeIntent('Crie uma documentação no arquivo docs/fluxo.md').kind,'compose');
+ assert.equal(routeIntent('Me mande o guia completo do Ophiuchus').kind,'local');
+});

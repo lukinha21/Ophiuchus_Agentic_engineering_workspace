@@ -121,6 +121,14 @@ const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({onClar
    return false;
   }
   taskLock.current=true;
+  if(intent.kind==='compose'){
+   try{
+    return await action('Escrevendo no chat',async()=>{
+     const result=await api<{answer:string}>('/chat/direct',{prompt:request,history,binding,confirmSend:true,compose:intent.format},undefined,AbortSignal.timeout(95000))
+     setMessages(m=>[...m,{id:crypto.randomUUID(),role:'assistant',text:result.answer}])
+    })
+   }finally{taskLock.current=false}
+  }
   const taskMode=mode==='auto'?(intent.kind==='direct'?'analyse':'orchestrate'):mode;
   const paths=selected.length?selected:preview?[preview.path]:[];
   if(taskMode==='orchestrate'){

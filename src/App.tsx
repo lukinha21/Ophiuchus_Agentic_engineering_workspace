@@ -74,6 +74,20 @@ export default function App(){
  const [runtimeError,setRuntimeError]=useState('')
  const [executingAI,setExecutingAI]=useState(false)
  const [apiOnline,setApiOnline]=useState(false)
+ const [bindingsLoaded,setBindingsLoaded]=useState(false)
+ const [configuredProviders,setConfiguredProviders]=useState<string[]|null>(null)
+ useEffect(()=>{
+  let active=true
+  const check=async()=>{
+   try{
+    const providers=await api<Array<{id:string;configured:boolean}>>('/providers',undefined,undefined,AbortSignal.timeout(4000))
+    if(active)setConfiguredProviders(providers.filter(provider=>provider.configured&&provider.id!=='mock').map(provider=>provider.id))
+   }catch{if(active)setConfiguredProviders(null)}
+  }
+  void check()
+  const interval=setInterval(()=>void check(),5000)
+  return()=>{active=false;clearInterval(interval)}
+ },[view,apiOnline])
  const [showAllTasks,setShowAllTasks]=useState(false)
  const [engineeringFilter,setEngineeringFilter]=useState<'all'|'active'|'completed'>('all')
  const [engineeringSelection,setEngineeringSelection]=useState<string|null>(null)
@@ -138,13 +152,13 @@ export default function App(){
  const activeAgent=agents.find(a=>a.id===activeTask.agentId)??agents[0]
  const currentSub=activeTask.subtasks.find(s=>s.status==='RUNNING')
  const completed=tasks.filter(t=>t.status==='SUCCESS').length
- const finished=events.some(e=>e.type==='run.completed')
- const cancelled=events.some(e=>e.type==='run.cancelled')
+ const missingAgents=defaultAgents.filter(required=>!agents.some(agent=>agent.role===required.role&&agent.enabled&&agent.modelBinding.modelId.trim()&&configuredProviders?.includes(agent.modelBinding.providerId)))
+ const readiness=!apiOnline?'API local indisponível':!configuredProviders||!bindingsLoaded?'Verificando configuração':missingAgents.length?'Configuração de agentes incompleta':'Sistema pronto'
  const eventList=useMemo(()=>events.filter(e=>selectedTask?e.taskId===selectedTask:selectedAgent?e.agentId===selectedAgent:true),[events,selectedTask,selectedAgent])
  const chooseTask=(id:string)=>{setPref('mode','engineering');setSelectedTask(id);setSelectedAgent(null);setPref('inspector',true)}
  const chooseAgent=(id:string)=>{setSelectedAgent(id);setSelectedTask(null);setPref('inspector',true)}
  const applyRuntime=(run:RuntimeRun)=>{if(localStorage.getItem('ophiuchus.activeRun')!==run.id)return;setRuntimeRun(run);const projected=projectRun(run);setTasks(projected.tasks);setStates(projected.states);setEvents(projected.events);setRunning(run.status==='RUNNING'&&run.sequence?.status!=='PAUSED');setSubmittedPrompt(run.prompt)}
- useEffect(()=>{api<Record<string,{providerId:string;modelId:string}>>('/bindings').then(saved=>setAgents(old=>old.map(a=>saved[a.id]?{...a,modelBinding:{...a.modelBinding,...saved[a.id],mode:'FIXED'}}:a))).catch(()=>{});},[])
+ useEffect(()=>{api<Record<string,{providerId:string;modelId:string}>>('/bindings').then(saved=>{setAgents(old=>old.map(a=>saved[a.id]?{...a,modelBinding:{...a.modelBinding,...saved[a.id],mode:'FIXED'}}:a));setBindingsLoaded(true)}).catch(()=>{});},[])
  useEffect(()=>{let alive=true;const poll=async()=>{try{const health=await api<{ok:boolean}>('/health');if(alive)setApiOnline(health.ok);const id=localStorage.getItem('ophiuchus.activeRun');if(id){const run=await api<RuntimeRun>(`/runs/${id}`);if(alive&&localStorage.getItem('ophiuchus.activeRun')===id)applyRuntime(run)}}catch{if(alive)setApiOnline(false)}};void poll();const interval=setInterval(()=>void poll(),1200);return()=>{alive=false;clearInterval(interval)}},[])
  const developerModel=agents.find(agent=>agent.enabled&&agent.role==='DEVELOPER')?.modelBinding
  const imageRefiner=developerModel?.providerId&&developerModel.providerId!=='mock'&&developerModel.modelId?developerModel:defaultPromptRefiner
@@ -173,7 +187,7 @@ export default function App(){
   setChat(turns=>[...turns,{role:'user',content:sent}]);setPrompt(current=>current.trim()===sent?'':current);
   try{
    let answer:string
-   if(intent.kind==='direct')answer=(await api<{answer:string}>('/chat/direct',{prompt:sent,history,binding,confirmSend:true},undefined,AbortSignal.timeout(95000))).answer
+   if(intent.kind==='direct'||intent.kind==='compose')answer=(await api<{answer:string}>('/chat/direct',{prompt:sent,history,binding,confirmSend:true,compose:intent.kind==='compose'?intent.format:undefined},undefined,AbortSignal.timeout(95000))).answer
    else if(intent.kind==='uncertain'&&binding?.providerId&&binding.providerId!=='mock'&&binding.modelId){
     answer=(await api<{answer:string}>('/chat/direct',{prompt:sent,history,binding,confirmSend:true,resolveIntent:true},undefined,AbortSignal.timeout(23000)).catch(()=>null))?.answer||intent.answer
    }else answer=intent.answer
@@ -232,8 +246,7 @@ export default function App(){
    <button title="Arquivos do projeto" aria-label="Arquivos do projeto" className={!showHistory&&prefs.sidebar&&view==='console'?'active':''} onClick={()=>{setView('console');setShowHistory(false);setPref('sidebar',showHistory||!prefs.sidebar)}}><FolderOpen size={20}/></button><div className="v5-dock-spacer"/><button title="Preferências visuais" aria-label="Preferências visuais" onClick={()=>setShowPreferences(true)}><SlidersHorizontal size={20}/></button>
   </aside>
   <div className="v5-body"><header className="v5-topbar"><div className="v5-wordmark"><strong>ophiuchus<span> /</span></strong><small>ESTÚDIO DE ENGENHARIA</small></div>
-   <div className="v5-tabs"><button className={view==='console'?'active':''} onClick={()=>setView('console')}><MessageCircle size={15}/> Console</button><button className={view==='dashboard'?'active':''} onClick={()=>setView('dashboard')}><BarChart3 size={15}/> Dashboard</button><button className={view==='settings'?'active':''} onClick={()=>setView('settings')}><Settings2 size={15}/> Provedores</button></div>
-   <div className="v5-live"><span className={`v5-led ${running?'pulse':''}`}/>{projectStatus.busy?'Trabalhando no projeto':projectStatus.active?projectStatus.name:running?'Execução em tempo real':finished?'Execução concluída':cancelled?'Execução cancelada':'Sistema pronto'}</div>
+   <div className="v5-live" role="status" title={apiOnline&&configuredProviders&&missingAgents.length?missingAgents.map(agent=>agent.name).join(', '):undefined}><span className={`v5-led ${running?'pulse':apiOnline&&bindingsLoaded&&configuredProviders&&!missingAgents.length?'':'needs-configuration'}`}/>{running?'Execução em tempo real':projectStatus.busy?'Trabalhando no projeto':readiness}</div>
    <div className="v5-top-actions">{view==='console'&&<><button className="v5-mode-toggle" title={help.modes} onClick={()=>setPref('mode',prefs.mode==='focus'?'engineering':'focus')}><LayoutGrid size={15}/>{prefs.mode==='focus'?'Modo Foco':'Modo Engenharia'}</button></>}</div>
   </header>
   <div className="v5-page" style={{display:view==='images'?undefined:'none'}}><ImageStudio configuredGenerator={imageGenerator} refiner={imageRefiner}/></div>

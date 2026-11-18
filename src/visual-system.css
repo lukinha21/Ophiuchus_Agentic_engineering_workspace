@@ -159,3 +159,21 @@
 .ophi-studio .legacy-console-flow>.v5-conversation{margin-bottom:18px}
 .ophi-studio .legacy-console-flow .project-message{max-width:min(700px,85%);padding:16px 20px;background:var(--studio-soft);border:1px solid var(--studio-rule);border-radius:10px;color:var(--studio-ink);overflow-wrap:anywhere}
 .ophi-studio .legacy-console-flow .project-message p{margin:8px 0 0}
+
+.settings-page .catalog-preview {
+  background: var(--studio-surface);
+  color: var(--studio-ink);
+  border: 1px solid var(--studio-rule);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.settings-page .catalog-preview .catalog-title span { color: var(--studio-muted); }
+.settings-page .catalog-preview .settings-muted { margin: 12px 0 0; }
+.image-model-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.image-model-actions .settings-secondary {
+  background: var(--studio-surface);
+  color: var(--studio-ink);
+  border: 1px solid var(--studio-rule);
+}
+.image-model-actions .settings-secondary:hover:not(:disabled) { background: var(--studio-soft); }
+.v5-led.needs-configuration { background: var(--studio-muted); box-shadow: none; }

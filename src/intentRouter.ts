@@ -113,6 +113,20 @@ function resolveContinuation(text: string, history: HistoryTurn[], inProject: bo
   }
 }
 
+function compositionFormat(text: string, history: HistoryTurn[]): 'storyboard' | 'prompt' | 'documentation' | undefined {
+  const asksForWriting = /\b(?:crie|cria|gere|gera|escreva|escreve|redija|monte|monta|faca|faz|elabore|prepare|preciso de|quero|mande|envie|me (?:de|da|manda|passa))\s+(?:(?:para mim|pra mim|me|voce|que voce|que|um|uma|o|a|novo|nova)\s+)*(?:prompt|roteiro|storyboard|documentacao|manual|guia)\b/
+  const projectChange = /\b(?:readme(?:\.md)?|docs\/[\w.-]+|[\w-]+\.(?:md|mdx|rst|adoc|txt|html|js|ts))\b|\b(?:salve|adicione|atualize|altere|crie|inclua|gere|escreva|grave)\b[^.!?]{0,100}\b(?:no repositorio|na pasta|no arquivo)\b/
+  if (projectChange.test(text) || /^(?:como|onde|qual|quais|o que)\b/.test(text)) return
+  const sceneByScene = /\b(?:cena (?:por|pos|apos) cena|cada cena|storyboard)\b/
+  const previousRequest = [...history].reverse().find(turn => turn.role === 'user')?.content
+    .normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+  if (sceneByScene.test(text) && (asksForWriting.test(text) ||
+    (previousRequest && asksForWriting.test(previousRequest)))) return 'storyboard'
+  if (!asksForWriting.test(text)) return
+  if (/\b(?:prompt|roteiro)\b/.test(text)) return 'prompt'
+  if (!/\b(?:do ophiuchus|seu funcionamento|sua arquitetura)\b/.test(text) || /\b(?:em markdown|para compartilhar|para usuarios|para publicar)\b/.test(text)) return 'documentation'
+}
+
 const identityAnswers = {
   introduction: 'Sou o Ophiuchus, seu assistente de engenharia de software.',
   capabilities: 'Posso explicar código, propor correções e coordenar uma equipe de agentes para tarefas maiores. Você revisa e aprova as alterações antes que elas sejam aplicadas ao projeto.',
@@ -140,6 +154,9 @@ export function routeIntent(prompt: string, history: HistoryTurn[] = [], now = n
       : 'O chat está sem modelo de IA configurado. As respostas locais do Ophiuchus continuam disponíveis.'
     return {kind: 'local', answer} as const
   }
+  const compose = compositionFormat(question, history)
+  if (compose) return {kind: 'compose', format: compose} as const
+
   const productAnswer = answerProductQuestion(question)
   if (productAnswer) return {kind: 'local', answer: productAnswer} as const
 
