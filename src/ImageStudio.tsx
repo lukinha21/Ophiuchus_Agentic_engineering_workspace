@@ -65,7 +65,7 @@ export default function ImageStudio({configuredGenerator,refiner}:{configuredGen
    {result.image&&<><img src={imageDataUrl(result.image)} alt={'Imagem gerada para: '+result.originalPrompt}/>
     <a className="image-save" href={imageDataUrl(result.image)} download={`ophiuchus-${result.mode}.${result.image.mimeType.split('/')[1]}`}><Download size={14}/> Salvar imagem</a></>}
    {result.text&&<ArtifactMarkdown text={result.text}/>}
-   <details><summary>{result.mode==='assisted'?'Ver descrição original e refinada':'Ver pedido'}</summary>
+   <details><summary>{result.mode==='assisted'?'Ver pedido original e prompt enviado':'Ver pedido'}</summary>
     <p>{result.originalPrompt}</p>{result.mode==='assisted'&&<p>{result.usedPrompt}</p>}
    </details>
   </article>
@@ -97,7 +97,7 @@ export default function ImageStudio({configuredGenerator,refiner}:{configuredGen
     {mode==='analyse'?<button type="button" disabled={!enabled} onClick={()=>void submit('analyse')}>Analisar</button>:<>
      <button type="button" disabled={!enabled} onClick={()=>void submit('direct')}>Gerar direto</button>
      <button type="button" disabled={!enabled} onClick={()=>void submit('assisted')}>Gerar com agente</button>
-     <small>O agente refina a descrição antes de enviá-la ao mesmo gerador.</small>
+     <small>O agente acrescenta um refinamento curto sem substituir o pedido original.</small>
     </>}
     {busy&&<button type="button" onClick={()=>operation.current?.abort()}>Interromper</button>}
    </div>

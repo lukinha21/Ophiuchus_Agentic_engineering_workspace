@@ -1,3 +1,4 @@
+import {refineImagePrompt} from './image-refinement.mjs';
 import productHelp from './product-help.json' with {type:'json'};
 import {driveSequence} from './run-sequence.mjs';
 import {prepareBrowser} from './browser-testing.mjs';
@@ -133,12 +134,7 @@ export const server=http.createServer(async(req,res)=>{
    const started=Date.now(),originalPrompt=input.prompt.trim();
    let usedPrompt=originalPrompt;
    if(mode==='assisted'){
-    const result=await generateText({providerId:refiner.providerId,model:refiner.modelId,maxOutputTokens:2048,messages:[
-     {role:'system',content:'Refine apenas a descrição para geração de uma imagem. Preserve tema, restrições, estilo especificado e todo texto que deve aparecer. Esclareça composição, enquadramento e iluminação quando couber. Não mude o assunto, não acrescente marcas ou texto visual sem solicitação. Retorne somente a descrição final.'},
-     {role:'user',content:originalPrompt}
-    ]},{signal:AbortSignal.any([controller.signal,AbortSignal.timeout(35000)])});
-    if(result.finishReason==='length'||!result.text.trim()||result.text.length>6000)throw Error('O agente não devolveu uma descrição completa.');
-    usedPrompt=result.text.trim();
+    usedPrompt=await refineImagePrompt(originalPrompt,refiner,{signal:AbortSignal.any([controller.signal,AbortSignal.timeout(35000)])});
    }
    const signal=AbortSignal.any([controller.signal,AbortSignal.timeout(120000)]);
    const media=mode==='analyse'?await generateGeminiMedia({model,prompt:usedPrompt,image},{signal}):await generateProviderImage({providerId,model,prompt:usedPrompt},{signal});
