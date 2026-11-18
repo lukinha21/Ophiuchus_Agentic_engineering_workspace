@@ -108,7 +108,7 @@ const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({onExpl
    taskLock.current=true
    try{
     return await action('Esclarecendo o pedido',async()=>{
-     const result=await api<{answer:string}>('/chat/direct',{prompt:request,history,binding,confirmSend:true,resolveIntent:true}).catch(()=>null)
+     const result=await api<{answer:string}>('/chat/direct',{prompt:request,history,binding,confirmSend:true,resolveIntent:true},undefined,AbortSignal.timeout(23000)).catch(()=>null)
      setMessages(m=>[...m,{id:crypto.randomUUID(),role:'assistant',text:result?.answer||intent.answer}])
     })
    }finally{taskLock.current=false}

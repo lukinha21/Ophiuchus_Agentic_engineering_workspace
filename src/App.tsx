@@ -129,9 +129,9 @@ export default function App(){
   setChat(turns=>[...turns,{role:'user',content:sent}]);setPrompt(current=>current.trim()===sent?'':current);
   try{
    let answer:string
-   if(intent.kind==='direct')answer=(await api<{answer:string}>('/chat/direct',{prompt:sent,history,binding,confirmSend:true})).answer
+   if(intent.kind==='direct')answer=(await api<{answer:string}>('/chat/direct',{prompt:sent,history,binding,confirmSend:true},undefined,AbortSignal.timeout(95000))).answer
    else if(intent.kind==='uncertain'&&binding?.providerId&&binding.providerId!=='mock'&&binding.modelId){
-    answer=(await api<{answer:string}>('/chat/direct',{prompt:sent,history,binding,confirmSend:true,resolveIntent:true}).catch(()=>null))?.answer||intent.answer
+    answer=(await api<{answer:string}>('/chat/direct',{prompt:sent,history,binding,confirmSend:true,resolveIntent:true},undefined,AbortSignal.timeout(23000)).catch(()=>null))?.answer||intent.answer
    }else answer=intent.answer
    if(epoch===uiEpoch.current)setChat(turns=>[...turns,{role:'assistant',content:answer}]);
   }catch(e){if(epoch===uiEpoch.current)setChat(turns=>[...turns,{role:'assistant',content:(e as Error).message,error:true}]);}

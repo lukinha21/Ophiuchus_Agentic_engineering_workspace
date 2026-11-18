@@ -34,10 +34,14 @@ const clarificationMessages = new Set([resendChoice,resendQuestion, continuation
 
 function resolveContinuation(text: string, history: HistoryTurn[], inProject: boolean) {
   const latest = history.at(-1)
+  const recentGuide = history.some(turn=>turn.role==='assistant'&&turn.content.trimStart().startsWith('# Guia do Ophiuchus'))
+  const guideChoice = latest?.role==='assistant'&&/guia completo|manual completo/i.test(latest.content)
+  if ((recentGuide||guideChoice)&&/^(?:complet[ao]|inteir[ao]|tud[oa]|o guia completo)$/.test(text)) return {kind:'local',answer:productGuide.trim()} as const
+  if (guideChoice&&/^(?:sim|quero|isso)$/.test(text)) return {kind:'clarify',answer:'Você quer o guia completo ou uma seção específica?'} as const
   const request = text.replace(/[,:]/g, ' ').replace(/\s+/g, ' ').replace(/^(?:por favor |entao )+/, '')
   const resendVerb = /\b(?:mand[ae]|mandar|envi[ae]|enviar|reenvi[ae]|reenviar|repit[ae]|repet[ei]|repetir|mostr[ae]|mostrar|receber)\b/
   const repeat = /\b(?:novamente|de novo|outra vez|mais uma vez)\b/
-  const asksToResend = (/^(?:de novo|novamente)$/.test(request) || resendVerb.test(request) && repeat.test(request) ||
+  const asksToResend = (/^(?:de novo|novamente|dnv)$/.test(request) || resendVerb.test(request) && repeat.test(request) ||
     /^(?:(?:voce )?(?:pode|consegue|poderia) )?(?:me )?(?:reenvie|reenvia|reenviar|repita|repete|repetir)\b/.test(request))
   const target = request
     .replace(/\b(?:por favor|de novo|outra vez|mais uma vez|do ophiuchus)\b/g, ' ')
@@ -60,11 +64,12 @@ function resolveContinuation(text: string, history: HistoryTurn[], inProject: bo
   if (asksToResend) {
     const explicitLast = /^(?:ultima resposta|resposta anterior)$/.test(target)
     const vagueReference = /^(?:isso|isto|aquilo|ela|ele|esse|essa|mesma coisa|o mesmo)$/.test(target)
-    const hasGuide = history.some(turn => turn.role === 'assistant' && turn.content.trimStart().startsWith('# Guia do Ophiuchus'))
+    const hasGuide = recentGuide
     const proposal = [...history].reverse().find(turn => turn.role === 'assistant' && turn.draftId)
     if (!explicitLast && vagueReference && hasGuide && proposal) return {kind:'clarify', answer:resendChoice} as const
     if (/^proposta$/.test(target) && proposal) return {kind:'local', answer:proposal.content, draftId:proposal.draftId} as const
-    if ((!target || vagueReference || explicitLast) && latest?.role === 'assistant' && latest.content.trim() && !clarificationMessages.has(latest.content)) {
+    if ((/^(?:dnv|novamente|de novo)$/.test(request))&&guideChoice) return {kind:'local',answer:productGuide.trim()} as const
+    if ((!target || target==='dnv' || vagueReference || explicitLast) && latest?.role === 'assistant' && latest.content.trim() && !clarificationMessages.has(latest.content)) {
       return {kind: 'local', answer: latest.content, draftId: latest.draftId} as const
     }
     return {kind: 'clarify', answer: resendQuestion} as const
