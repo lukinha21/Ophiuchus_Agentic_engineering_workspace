@@ -89,7 +89,7 @@ test('creation without a named target asks before dispatch and offers safe compl
 
 test('main-chat image intent separates media requests from coding and incomplete prompts',async()=>{
  const {imageIntent}=await moduleFrom('src/chatMedia.ts');
- for(const prompt of ['Gere uma imagem de uma árvore','Você pode gerar uma ilustração de um foguete?','faz uma foto de um cão','faça a imagem de um gato de botas','faz pra mim a imagem de um gato','crie o desenho de um barco']){
+ for(const prompt of ['Gere uma imagem de uma árvore','Você pode gerar uma ilustração de um foguete?','faz uma foto de um cão','faça a imagem de um gato de botas','faz pra mim a imagem de um gato','crie o desenho de um barco','quero que faça uma imagem de um gato de botas','eu queria que vc criasse uma imagem de um foguete','gostaria de gerar uma imagem de um castelo','Um gato de botas na chuva, faça uma imagem disso','Uma cidade no deserto. Quero que gere uma imagem']){
   assert.deepEqual(imageIntent(prompt),{kind:'generate',mode:'direct'});
  }
  assert.deepEqual(imageIntent('Crie uma imagem de uma árvore com um agente'),{kind:'generate',mode:'assisted'});
@@ -98,4 +98,7 @@ test('main-chat image intent separates media requests from coding and incomplete
  assert.equal(imageIntent('Crie uma imagem Docker para o projeto'),null);
  assert.equal(imageIntent('Implemente um gerador de imagens'),null);
  assert.equal(imageIntent('Como gerar uma imagem?'),null);
+ assert.equal(imageIntent('Explique este exemplo, gere uma imagem de um gato'),null);
+ assert.equal(imageIntent('Quero que crie uma imagem Docker'),null);
+ assert.deepEqual(imageIntent('Quero que faça uma imagem'),{kind:'clarify'});
 });

@@ -37,13 +37,25 @@ export function encodeImage(file:File):Promise<MediaImage>{
 
 export function imageIntent(prompt:string){
  const normalized=prompt.trim().normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase()
- const command=/^(?:por favor[, ]+)?(?:(?:voce|vc) )?(?:(?:pode|consegue|poderia) )?(?:me )?(?:gere|gera|gerar|crie|cria|criar|faca|faz|fazer|produza|desenhe) (?:(?:pra|para) mim )?(?:(?:um|uma|o|a) )?(?:imagem|ilustracao|foto|desenho|arte visual)\b/.exec(normalized)
- if(!command)return null
- let subject=normalized.slice(command[0].length).replace(/(?:,? por favor)[.!?]*$/,'').trim()
- if(/^(?:docker|oci|de container|de conteiner)\b/.test(subject))return null
+ const imageCommand=/^(?:por favor[, ]+)?(?:(?:eu )?(?:(?:quero|queria|gostaria|preciso) (?:que |de )?))?(?:(?:voce|vc) )?(?:(?:pode|consegue|poderia|conseguiria) )?(?:me )?(?:gere|gera|gerar|crie|cria|criar|criasse|faca|faz|fazer|fizesse|produza|produzir|desenhe|desenhar) (?:(?:pra|para) mim )?(?:(?:um|uma|o|a) )?(?:imagem|ilustracao|foto|desenho|arte visual)\b/
+ let command=imageCommand.exec(normalized)
+ let line=normalized
+ let descriptionBefore=''
+ if(!command){
+  const parts=normalized.split(/(?:[,;.!?] +|\r?\n+)/)
+  if(parts.length<2)return null
+  line=parts.at(-1)?.trim()||''
+  command=imageCommand.exec(line)
+  if(!command)return null
+  descriptionBefore=parts.slice(0,-1).join(' ').trim()
+  if(/^(?:como|por que|o que|explique|ele disse|ela disse|se eu disser|exemplo)\b/.test(descriptionBefore))return null
+ }
+ let subject=line.slice(command[0].length).replace(/(?:,? por favor)[.!?]*$/,'').trim()
+ if(/^(?:(?:de|do|da) )?(?:docker|oci|container|conteiner)\b/.test(subject))return null
  const assisted=/\b(?:com (?:um )?agente|com refino|com refinamento)(?:[.!? ]*)$/.test(subject)
  subject=subject.replace(/\b(?:com (?:um )?agente|com refino|com refinamento)(?:[.!? ]*)$/,'').replace(/^[\s:,.!?]+|[\s:,.!?]+$/g,'').trim()
  if(!subject||/^(?:de|da|do|sobre|disso|disto|daquilo|dela|dele|de novo|novamente)$/.test(subject)){
+  if(descriptionBefore)return {kind:'generate',mode:assisted?'assisted':'direct'} as const
   return {kind:'clarify'} as const
  }
  return {kind:'generate',mode:assisted?'assisted':'direct'} as const
