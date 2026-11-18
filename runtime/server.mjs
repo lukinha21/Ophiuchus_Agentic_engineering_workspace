@@ -55,6 +55,16 @@ let saving=Promise.resolve();
 const save=()=>{const snapshot=JSON.stringify(runs,null,2);const pending=saving.catch(()=>{}).then(async()=>{await mkdir(dirname(DB),{recursive:true});const temporary=DB+'.'+randomUUID()+'.tmp';await writeFile(temporary,snapshot,{mode:0o600});await rename(temporary,DB);});saving=pending;return pending;};
 const json=(res,code,value)=>{res.writeHead(code,{'content-type':'application/json; charset=utf-8','cache-control':'no-store'});res.end(JSON.stringify(value));};
 const readBody=async(req,maxBytes=1024*1024)=>{let text='';for await(const chunk of req){text+=chunk;if(text.length>maxBytes)throw Error('Payload grande demais');}return JSON.parse(text||'{}');};
+function bodyRefiner(input,developer){
+ const candidate=input.refinerModel===undefined
+  ?(developer?.providerId&&developer.providerId!=='mock'?developer:{providerId:'google',modelId:'gemini-3.1-flash-lite'})
+  :{providerId:input.refinerProviderId??'google',modelId:input.refinerModel};
+ if(!['google','openai','openrouter','anthropic','custom'].includes(candidate.providerId)||
+   typeof candidate.modelId!=='string'||candidate.modelId.length>180||
+   !(candidate.providerId==='google'?/^[a-zA-Z0-9._-]{1,128}$/:/^[a-zA-Z0-9._:/-]+$/).test(candidate.modelId))return null;
+ return candidate;
+}
+
 export const server=http.createServer(async(req,res)=>{
  try{
   // Reject cross-site browser requests, including local-network origins.
@@ -108,7 +118,8 @@ export const server=http.createServer(async(req,res)=>{
   if(req.method==='POST'&&url.pathname==='/chat/images'){
    const input=await readBody(req,Math.ceil(maxImageInputBytes/3)*4+40000);
    if(input?.confirmSend!==true)throw Error('Autorize o envio da solicitação ao provedor de imagem.');
-   const {mode,refinerModel,image}=input;
+   const {mode,image}=input;
+   const refiner=bodyRefiner(input,bindings.developer);
    const configured=mode!=='analyse'&&input.useConfiguredModel===true?bindings['image-generator']:null;
    const providerId=mode==='analyse'?'google':configured?.providerId??input.providerId??'google';
    const model=configured?.modelId??input.model;
@@ -116,13 +127,13 @@ export const server=http.createServer(async(req,res)=>{
    if(typeof input.prompt!=='string'||!input.prompt.trim()||input.prompt.length>4000)throw Error('Informe um pedido de até 4.000 caracteres.');
    if(mode==='analyse'?!image:image!==undefined)throw Error(mode==='analyse'?'Anexe uma imagem para analisar.':'Use a descrição para gerar uma imagem.');
    if(!validImageModel(providerId,model))throw Error('Informe um modelo válido para o provedor selecionado.');
-   if(mode==='assisted'&&(typeof refinerModel!=='string'||!/^[a-zA-Z0-9._-]{1,128}$/.test(refinerModel)))throw Error('Informe um modelo Gemini de texto para refinar a descrição.');
+   if(mode==='assisted'&&!refiner)throw Error('Configure um modelo de texto válido para o Desenvolvedor em Agentes e modelos.');
    const controller=new AbortController();
    res.once('close',()=>controller.abort());
    const started=Date.now(),originalPrompt=input.prompt.trim();
    let usedPrompt=originalPrompt;
    if(mode==='assisted'){
-    const result=await generateText({providerId:'google',model:refinerModel,maxOutputTokens:2048,messages:[
+    const result=await generateText({providerId:refiner.providerId,model:refiner.modelId,maxOutputTokens:2048,messages:[
      {role:'system',content:'Refine apenas a descrição para geração de uma imagem. Preserve tema, restrições, estilo especificado e todo texto que deve aparecer. Esclareça composição, enquadramento e iluminação quando couber. Não mude o assunto, não acrescente marcas ou texto visual sem solicitação. Retorne somente a descrição final.'},
      {role:'user',content:originalPrompt}
     ]},{signal:AbortSignal.any([controller.signal,AbortSignal.timeout(35000)])});

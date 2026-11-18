@@ -4,13 +4,13 @@ import {Download,Image as ImageIcon,Paperclip,Search,Sparkles,X} from 'lucide-re
 import ArtifactMarkdown from './ArtifactMarkdown'
 import {api} from './runtimeClient'
 import {defaultVisionModel,encodeImage,imageDataUrl,imageProviders,isSupportedImage} from './chatMedia'
-import type {ImageBinding,ImageProviderId,MediaResult} from './chatMedia'
+import type {ImageBinding,ImageProviderId,MediaResult,PromptRefinerBinding} from './chatMedia'
 import './image-studio.css'
 
 type Mode = 'analyse' | 'direct' | 'assisted'
 type Entry = {id: string; result: MediaResult}
 const modeLabel = {analyse:'Análise',direct:'Direta',assisted:'Com agente'}
-export default function ImageStudio({configuredGenerator}:{configuredGenerator:ImageBinding}){
+export default function ImageStudio({configuredGenerator,refiner}:{configuredGenerator:ImageBinding;refiner:PromptRefinerBinding}){
  const [mode,setMode]=useState<'analyse'|'generate'>('analyse')
  const [textModel,setTextModel]=useState(defaultVisionModel)
  const [generator,setGenerator]=useState(configuredGenerator)
@@ -44,7 +44,7 @@ export default function ImageStudio({configuredGenerator}:{configuredGenerator:I
    const result=await api<MediaResult>('/chat/images',{
     mode:next,prompt,model:next==='analyse'?textModel.trim():generator.modelId.trim(),providerId:next==='analyse'?'google':generator.providerId,
     ...(next==='analyse'&&file?{image:await encodeImage(file)}:{}),
-    ...(next==='assisted'?{refinerModel:textModel.trim()}:{}),confirmSend:true,
+    ...(next==='assisted'?{refinerModel:refiner.modelId,refinerProviderId:refiner.providerId}:{}),confirmSend:true,
    },undefined,AbortSignal.any([controller.signal,AbortSignal.timeout(160000)]))
    if(!controller.signal.aborted)setEntries(previous=>[{id:crypto.randomUUID(),result},...previous])
   }catch(error){
@@ -80,7 +80,7 @@ export default function ImageStudio({configuredGenerator}:{configuredGenerator:I
   <section className="image-composer" aria-label="Pedido de imagem">
    <div className="image-fields">
     {mode==='generate'&&<><label>Provedor de imagem<select disabled={Boolean(busy)} value={generator.providerId} onChange={event=>{const providerId=event.target.value as ImageProviderId;setGenerator({providerId,modelId:providerId===configuredGenerator.providerId?configuredGenerator.modelId:''});setConsent(false)}}>{Object.entries(imageProviders).map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label><label>Modelo de imagem<input disabled={Boolean(busy)} value={generator.modelId} maxLength={128} onChange={event=>setGenerator(current=>({...current,modelId:event.target.value}))}/></label></>}
-    <label>{mode==='analyse'?'Modelo de análise':'Modelo do agente de prompt'}<input disabled={Boolean(busy)} value={textModel} maxLength={128} onChange={event=>setTextModel(event.target.value)}/></label>
+    {mode==='analyse'?<label>Modelo de análise<input disabled={Boolean(busy)} value={textModel} maxLength={128} onChange={event=>setTextModel(event.target.value)}/></label>:<div><strong>Agente de prompt</strong><p className="image-refiner-label">{refiner.providerId} · {refiner.modelId} · usa a configuração do Desenvolvedor quando disponível</p></div>}
    </div>
    {mode==='analyse'&&<div className="image-attachment">
     <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={event=>{attach(event.target.files?.[0]);event.target.value=''}}/>
@@ -91,12 +91,12 @@ export default function ImageStudio({configuredGenerator}:{configuredGenerator:I
     <textarea value={prompt} disabled={Boolean(busy)} maxLength={4000} onPaste={paste} onChange={event=>setPrompt(event.target.value)} placeholder={mode==='analyse'?'O que este print mostra?':'Descreva a cena, o estilo e os detalhes que quer preservar.'}/>
    </label>
    <label className="image-consent"><input type="checkbox" disabled={Boolean(busy)} checked={consent} onChange={event=>setConsent(event.target.checked)}/>
-    {mode==='analyse'?'Autorizo o envio da imagem e da pergunta ao Google Gemini.':'Autorizo o envio da descrição a '+imageProviders[generator.providerId]+'. Com agente, o refinamento usa o Gemini. As chamadas podem gerar custos.'}
+    {mode==='analyse'?'Autorizo o envio da imagem e da pergunta ao Google Gemini.':'Autorizo o envio da descrição a '+imageProviders[generator.providerId]+'. Com agente, a descrição também é enviada a '+refiner.providerId+' para refinamento. As chamadas podem gerar custos.'}
    </label>
    <div className="image-actions">
     {mode==='analyse'?<button type="button" disabled={!enabled} onClick={()=>void submit('analyse')}>Analisar</button>:<>
      <button type="button" disabled={!enabled} onClick={()=>void submit('direct')}>Gerar direto</button>
-     <button type="button" disabled={!enabled||!textModel.trim()} onClick={()=>void submit('assisted')}>Gerar com agente</button>
+     <button type="button" disabled={!enabled} onClick={()=>void submit('assisted')}>Gerar com agente</button>
      <small>O agente refina a descrição antes de enviá-la ao mesmo gerador.</small>
     </>}
     {busy&&<button type="button" onClick={()=>operation.current?.abort()}>Interromper</button>}
