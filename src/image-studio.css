@@ -1,3 +1,4 @@
+.chat-image{margin:10px 0;max-width:540px}.chat-image img{display:block;max-width:100%;max-height:430px;border-radius:8px;margin-bottom:8px}.chat-attachment{display:flex;align-items:center;gap:8px;padding:6px 10px;color:var(--studio-muted);font-size:12px}.chat-attachment span{overflow-wrap:anywhere}
 .image-studio{width:min(900px,100%);margin:0 auto;padding:28px clamp(15px,4vw,34px);color:var(--studio-ink)}
 .image-studio-head{display:flex;gap:13px;align-items:center;margin-bottom:18px}.image-studio-head h1,.image-comparison h2{margin:0}.image-studio-head p{margin:4px 0;color:var(--studio-muted);font-size:13px}
 .image-modes,.image-actions,.image-attachment{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin:10px 0}

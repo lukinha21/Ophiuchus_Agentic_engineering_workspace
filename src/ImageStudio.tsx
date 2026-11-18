@@ -3,35 +3,17 @@ import type {ClipboardEvent} from 'react'
 import {Download,Image as ImageIcon,Paperclip,Search,Sparkles,X} from 'lucide-react'
 import ArtifactMarkdown from './ArtifactMarkdown'
 import {api} from './runtimeClient'
+import {defaultImageModel,defaultVisionModel,encodeImage,imageDataUrl,isSupportedImage} from './chatMedia'
+import type {MediaResult} from './chatMedia'
 import './image-studio.css'
 
 type Mode = 'analyse' | 'direct' | 'assisted'
-type Media = {mimeType: 'image/png' | 'image/jpeg' | 'image/webp'; data: string}
-type MediaResult = {
- mode: Mode; model: string; originalPrompt: string; usedPrompt: string
- elapsedMs: number; calls: number; text?: string; image?: Media
-}
 type Entry = {id: string; result: MediaResult}
-const supported = ['image/png','image/jpeg','image/webp']
 const modeLabel = {analyse:'Análise',direct:'Direta',assisted:'Com agente'}
-const dataUrl = (image:Media) => `data:${image.mimeType};base64,${image.data}`
-function encodeFile(file:File):Promise<Media>{
- return new Promise((resolve,reject)=>{
-  const reader=new FileReader()
-  reader.onerror=()=>reject(Error('Não foi possível ler o arquivo.'))
-  reader.onload=()=>{
-   const encoded=String(reader.result).split(',')[1]
-   if(!encoded){reject(Error('A imagem está vazia.'));return}
-   resolve({mimeType:file.type as Media['mimeType'],data:encoded})
-  }
-  reader.readAsDataURL(file)
- })
-}
-
 export default function ImageStudio(){
  const [mode,setMode]=useState<'analyse'|'generate'>('analyse')
- const [textModel,setTextModel]=useState('gemini-3.1-flash-lite')
- const [imageModel,setImageModel]=useState('gemini-3.1-flash-lite-image')
+ const [textModel,setTextModel]=useState(defaultVisionModel)
+ const [imageModel,setImageModel]=useState(defaultImageModel)
  const [prompt,setPrompt]=useState('')
  const [file,setFile]=useState<File|null>(null)
  const [busy,setBusy]=useState<Mode|null>(null)
@@ -43,7 +25,7 @@ export default function ImageStudio(){
 
  function attach(next:File|undefined){
   if(!next)return
-  if(!supported.includes(next.type)||next.size===0||next.size>4*1024*1024){
+  if(!isSupportedImage(next)){
    setFile(null);setConsent(false);setError('Escolha uma imagem PNG, JPEG ou WebP de até 4 MB.');return
   }
   setFile(next);setConsent(false);setError('')
@@ -60,7 +42,7 @@ export default function ImageStudio(){
   try{
    const result=await api<MediaResult>('/chat/images',{
     mode:next,prompt,model:next==='analyse'?textModel.trim():imageModel.trim(),
-    ...(next==='analyse'&&file?{image:await encodeFile(file)}:{}),
+    ...(next==='analyse'&&file?{image:await encodeImage(file)}:{}),
     ...(next==='assisted'?{refinerModel:textModel.trim()}:{}),confirmSend:true,
    },undefined,AbortSignal.any([controller.signal,AbortSignal.timeout(160000)]))
    if(!controller.signal.aborted)setEntries(previous=>[{id:crypto.randomUUID(),result},...previous])
@@ -79,8 +61,8 @@ export default function ImageStudio(){
  function card({id,result}:Entry){
   return <article className="image-result" key={id}>
    <header><strong>{modeLabel[result.mode]}</strong><small>{result.model} · {result.calls} {result.calls===1?'chamada':'chamadas'} · {(result.elapsedMs/1000).toFixed(1)} s</small></header>
-   {result.image&&<><img src={dataUrl(result.image)} alt={'Imagem gerada para: '+result.originalPrompt}/>
-    <a className="image-save" href={dataUrl(result.image)} download={`ophiuchus-${result.mode}.${result.image.mimeType.split('/')[1]}`}><Download size={14}/> Salvar imagem</a></>}
+   {result.image&&<><img src={imageDataUrl(result.image)} alt={'Imagem gerada para: '+result.originalPrompt}/>
+    <a className="image-save" href={imageDataUrl(result.image)} download={`ophiuchus-${result.mode}.${result.image.mimeType.split('/')[1]}`}><Download size={14}/> Salvar imagem</a></>}
    {result.text&&<ArtifactMarkdown text={result.text}/>}
    <details><summary>{result.mode==='assisted'?'Ver descrição original e refinada':'Ver pedido'}</summary>
     <p>{result.originalPrompt}</p>{result.mode==='assisted'&&<p>{result.usedPrompt}</p>}

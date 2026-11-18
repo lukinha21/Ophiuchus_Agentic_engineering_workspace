@@ -86,3 +86,16 @@ test('creation without a named target asks before dispatch and offers safe compl
  assert.equal(routeIntent('Crie um novo arquivo sum.mjs').kind,'engineering');
  assert.equal(routeIntent('Crie um novo projeto para calcular despesas').kind,'engineering');
 });
+
+test('main-chat image intent separates media requests from coding and incomplete prompts',async()=>{
+ const {imageIntent}=await moduleFrom('src/chatMedia.ts');
+ for(const prompt of ['Gere uma imagem de uma árvore','Você pode gerar uma ilustração de um foguete?','faz uma foto de um cão']){
+  assert.deepEqual(imageIntent(prompt),{kind:'generate',mode:'direct'});
+ }
+ assert.deepEqual(imageIntent('Crie uma imagem de uma árvore com um agente'),{kind:'generate',mode:'assisted'});
+ assert.deepEqual(imageIntent('Gere uma imagem, por favor'),{kind:'clarify'});
+ assert.deepEqual(imageIntent('Gere uma imagem disso'),{kind:'clarify'});
+ assert.equal(imageIntent('Crie uma imagem Docker para o projeto'),null);
+ assert.equal(imageIntent('Implemente um gerador de imagens'),null);
+ assert.equal(imageIntent('Como gerar uma imagem?'),null);
+});

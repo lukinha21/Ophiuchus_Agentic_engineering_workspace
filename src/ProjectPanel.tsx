@@ -6,6 +6,8 @@ import {api} from './runtimeClient'
 import {routeIntent} from './intentRouter'
 import ArtifactMarkdown from './ArtifactMarkdown'
 import ClarificationOptions from './ClarificationOptions'
+import ChatImage from './ChatImage'
+import type {MediaTurn} from './chatMedia'
 import './project-panel.css'
 import ProjectFlow from './ProjectFlow'
 import WorkspaceArea from './WorkspaceArea'
@@ -16,7 +18,7 @@ import {SavedProposal,snapshotFlow} from './ChatHistory'
 import type {ArchivedChat,ChatSnapshot} from './ChatHistory'
 import type {RecoveryBinding} from './FlowRecovery'
 import DeliverySummary,{deliveryStatus} from './DeliverySummary'
-type Turn={id:string;role:'user'|'assistant';text:string;error?:boolean;draftId?:string;flowId?:string}
+type Turn={id:string;role:'user'|'assistant';text:string;error?:boolean;draftId?:string;flowId?:string;mediaId?:string}
 type FileInfo={path:string;bytes:number}
 type Project={id:string;root:string;name:string;files:FileInfo[];warnings:string[];drafts?:Array<{id:string;summary:string;status:string;createdAt:string}>}
 type Change={path:string;content:string;before:string|null;reason:string;applied:boolean;diff:{tooLarge:boolean;lines:Array<{kind:string;text:string}>}}
@@ -26,7 +28,7 @@ function FileTree({files,selected,onSelect,onOpen,prefix='',depth=0}:{files:File
  const direct=files.filter(f=>!f.path.slice(prefix.length).includes('/'))
  return <div className="project-tree-level">{[...folders].sort().map(folder=><details key={folder} open={depth<1}><summary><FolderOpen size={14}/>{folder}</summary><FileTree files={files.filter(f=>f.path.startsWith(prefix+folder+'/'))} selected={selected} onSelect={onSelect} onOpen={onOpen} prefix={prefix+folder+'/'} depth={depth+1}/></details>)}{direct.map(f=><div className="project-file" key={f.path}><label title={'Incluir no contexto: '+f.path}><input type="checkbox" checked={selected.includes(f.path)} onChange={()=>onSelect(f.path)}/><FileCode2 size={14}/><span>{f.path.slice(prefix.length)}</span></label><button aria-label={'Ler '+f.path} title={'Ler '+f.path} onClick={()=>onOpen(f.path)}><Eye size={14}/></button></div>)}</div>
 }
-export type ProjectHandle={submit:(goal:string)=>Promise<boolean>;openFolder:()=>Promise<boolean>;openChat:(saved:ArchivedChat|null)=>Promise<void>}
+export type ProjectHandle={submit:(goal:string)=>Promise<boolean>;submitMedia:(request:string,job:()=>Promise<MediaTurn>)=>Promise<boolean>;openFolder:()=>Promise<boolean>;openChat:(saved:ArchivedChat|null)=>Promise<void>}
 export type ProjectStatus={active:boolean;name:string;busy:boolean;canSend:boolean}
 type Props={onClarification:(prompt:string)=>void;onExplorer:()=>void;onArchive?: (snapshot:ChatSnapshot)=>void;agents:AgentDefinition[];onSettings:()=>void;sidebarTarget:HTMLElement|null;workTarget:HTMLElement|null;onStatus:(status:ProjectStatus)=>void;onNewChat:()=>void;engineering:boolean;inspectorTarget:HTMLElement|null;onInspect:()=>void;onCloseInspector:()=>void;disabled?:boolean}
 const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({onClarification,onExplorer,onArchive,agents,onSettings,sidebarTarget,workTarget,onStatus,onNewChat,engineering,inspectorTarget,onInspect,onCloseInspector,disabled=false},ref){
@@ -188,7 +190,18 @@ const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({onClar
   })
   onArchive({id:chatId,project:project.name,projectRoot:project.root,selectedPaths:selected,messages,flows:chatFlows,drafts:[...archivedDrafts.current.values()]})
  },[chatId,draft,flows,messages,onArchive,project?.id,project?.name,project?.root,selected])
- useImperativeHandle(ref,()=>({submit:task,openFolder:pick,openChat}))
+ const submitMedia=async(request:string,job:()=>Promise<MediaTurn>)=>{
+  if(!project||busy||taskLock.current)return false
+  taskLock.current=true
+  setMessages(turns=>[...turns,{id:crypto.randomUUID(),role:'user',text:request}])
+  try{
+   return await action('Processando imagem',async()=>{
+    try{const result=await job();setMessages(turns=>[...turns,{id:crypto.randomUUID(),role:'assistant',...result}])}
+    catch(error){setMessages(turns=>[...turns,{id:crypto.randomUUID(),role:'assistant',text:(error as Error).message,error:true}])}
+   })
+  }finally{taskLock.current=false}
+ }
+ useImperativeHandle(ref,()=>({submit:task,submitMedia,openFolder:pick,openChat}))
  const canSend=Boolean(project&&!busy)
  const draftFlow=draft?.workflowId?flows[draft.workflowId]:null;const canApplyDraft=!draft?.workflowId||(draftFlow?.status==='READY'&&draftFlow.draftId===draft.id)
  useEffect(()=>onStatus({active:Boolean(project||pendingChat),name:project?.name||pendingChat?.project||'',busy:Boolean(busy),canSend}),[project?.id,project?.name,pendingChat,busy,canSend,onStatus])
@@ -209,6 +222,7 @@ const ProjectPanel=forwardRef<ProjectHandle,Props>(function ProjectPanel({onClar
    <div className={'v5-chat-avatar '+message.role}>{message.role==='user'?<UserRound size={22}/>:<Sparkles size={22}/>}</div>
    <div className={'project-message '+(message.error?'project-message-error':'')}><span className="v5-chat-by">{message.role==='user'?'Você':'Ophiuchus'}</span>
     <ArtifactMarkdown text={message.text}/>
+    {message.mediaId&&<ChatImage key={message.mediaId} id={message.mediaId}/> }
     {message.role==='assistant'&&messages.at(-1)?.id===message.id&&<ClarificationOptions answer={message.text} onChoose={onClarification}/>}
     {project&&message.draftId&&(!savedDraft||project.drafts?.some(item=>item.id===message.draftId)||Object.values(flows).some(item=>item.draftId===message.draftId&&item.projectId===project.id))&&<button disabled={Boolean(busy)} onClick={()=>showDraft(message.draftId!)}><GitCompareArrows size={14}/> Revisar proposta</button>}
    </div>

@@ -11,6 +11,7 @@ type ArchivedTurn = {
   text: string
   flowId?: string
   draftId?: string
+  mediaId?: string
   error?: boolean
 }
 type ArchivedDraft = {
